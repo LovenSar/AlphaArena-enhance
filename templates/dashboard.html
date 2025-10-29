@@ -1,0 +1,3010 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alpha Arena - DeepSeek-V3 AI Trading</title>
+
+    <!-- PWA Support -->
+    <link rel="manifest" href="/static/manifest.json">
+    <meta name="theme-color" content="#00D9FF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Alpha Arena">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* ===== 专业级配色系统 ===== */
+            --primary: #2DD4BF;        /* Teal-400 */
+            --primary-light: #5EEAD4;  /* Teal-300 */
+            --primary-dark: #14B8A6;   /* Teal-500 */
+
+            --secondary: #8B7FD8;      /* 柔和紫 */
+            --secondary-light: #A78BFA;
+            --secondary-dark: #7C3AED;
+
+            --accent: #E879F9;         /* 粉紫 */
+            --accent-light: #F0ABFC;
+            --accent-dark: #D946EF;
+
+            /* ===== 语义色系 ===== */
+            --success: #10B981;        /* Emerald-500 */
+            --success-light: #34D399;  /* Emerald-400 */
+            --danger: #EF4444;         /* Red-500 */
+            --danger-light: #F87171;   /* Red-400 */
+            --warning: #F59E0B;        /* Amber-500 */
+            --info: #3B82F6;           /* Blue-500 */
+
+            /* ===== 背景色系统 ===== */
+            --bg-dark: #0A0A0F;
+            --bg-darker: #050508;
+            --bg-card: rgba(20, 20, 30, 0.6);
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-hover: rgba(255, 255, 255, 0.08);
+            --glass-border: rgba(255, 255, 255, 0.1);
+
+            /* ===== 文本色系统 ===== */
+            --text-primary: #FFFFFF;
+            --text-secondary: #A8B0C8;
+            --text-tertiary: #6B7280;
+
+            /* ===== 发光效果 ===== */
+            --glow-primary: rgba(45, 212, 191, 0.3);
+            --glow-secondary: rgba(139, 127, 216, 0.3);
+            --glow-accent: rgba(232, 121, 249, 0.3);
+
+            /* ===== 圆角系统 ===== */
+            --radius-sm: 0.375rem;   /* 6px */
+            --radius-md: 0.5rem;     /* 8px */
+            --radius-lg: 0.75rem;    /* 12px */
+            --radius-xl: 1rem;       /* 16px */
+            --radius-2xl: 1.5rem;    /* 24px */
+            --radius-full: 9999px;
+
+            /* ===== 阴影系统 - 专业级 ===== */
+            --shadow-sm:
+                0 1px 2px 0 rgba(0, 0, 0, 0.05),
+                0 0 8px 0 rgba(45, 212, 191, 0.03);
+
+            --shadow-md:
+                0 4px 6px -1px rgba(0, 0, 0, 0.15),
+                0 2px 4px -1px rgba(0, 0, 0, 0.08),
+                0 0 16px 0 rgba(45, 212, 191, 0.06);
+
+            --shadow-lg:
+                0 10px 15px -3px rgba(0, 0, 0, 0.2),
+                0 4px 6px -2px rgba(0, 0, 0, 0.08),
+                0 0 24px 0 rgba(45, 212, 191, 0.08);
+
+            --shadow-xl:
+                0 20px 25px -5px rgba(0, 0, 0, 0.25),
+                0 10px 10px -5px rgba(0, 0, 0, 0.1),
+                0 0 32px 0 rgba(45, 212, 191, 0.1);
+
+            --shadow-glow:
+                0 0 20px rgba(45, 212, 191, 0.2),
+                0 0 40px rgba(45, 212, 191, 0.1);
+
+            /* ===== 过渡动画 ===== */
+            --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+            --transition-bounce: 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            min-height: 100vh;
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        /* ===== 高级动态背景 ===== */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background:
+                radial-gradient(ellipse 800px 600px at 20% 30%, rgba(45, 212, 191, 0.18) 0%, transparent 50%),
+                radial-gradient(ellipse 600px 800px at 80% 70%, rgba(139, 127, 216, 0.15) 0%, transparent 50%),
+                radial-gradient(ellipse 700px 700px at 50% 50%, rgba(232, 121, 249, 0.12) 0%, transparent 50%);
+            animation: bgShift 25s ease-in-out infinite;
+            z-index: -1;
+        }
+
+        @keyframes bgShift {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+            }
+            50% {
+                opacity: 0.85;
+                transform: scale(1.08) rotate(2deg);
+            }
+        }
+
+        /* 网格图案 - 更细腻 */
+        body::after {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(45, 212, 191, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(45, 212, 191, 0.03) 1px, transparent 1px);
+            background-size: 60px 60px;
+            z-index: -1;
+            opacity: 0.4;
+            animation: gridMove 30s linear infinite;
+        }
+
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(60px, 60px); }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 1.5rem 2rem;
+        }
+
+        /* ===== Header - 左右布局 ===== */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+            position: relative;
+            padding: 1rem 0;
+            border-bottom: 1px solid rgba(45, 212, 191, 0.1);
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(90deg,
+                transparent 0%,
+                var(--primary) 50%,
+                transparent 100%);
+            animation: headerLine 3s ease-in-out infinite;
+        }
+
+        @keyframes headerLine {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .header h1 {
+            font-size: clamp(1.75rem, 4vw, 2.5rem);
+            font-weight: 900;
+            margin: 0;
+            background: linear-gradient(135deg,
+                var(--primary) 0%,
+                var(--secondary) 40%,
+                var(--accent) 70%,
+                var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.03em;
+            position: relative;
+            animation: headerGlow 4s ease-in-out infinite;
+            filter: drop-shadow(0 0 20px var(--glow-primary));
+        }
+
+        @keyframes headerGlow {
+            0%, 100% {
+                filter: drop-shadow(0 0 20px var(--glow-primary))
+                        drop-shadow(0 0 40px var(--glow-primary));
+            }
+            50% {
+                filter: drop-shadow(0 0 30px var(--glow-secondary))
+                        drop-shadow(0 0 60px var(--glow-secondary));
+            }
+        }
+
+        .header .subtitle {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin: 0;
+            opacity: 0.7;
+        }
+
+        .header .ai-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            background: linear-gradient(135deg,
+                rgba(45, 212, 191, 0.12),
+                rgba(16, 185, 129, 0.08));
+            border: 1.5px solid var(--success);
+            backdrop-filter: blur(16px);
+            padding: 0.6rem 1.2rem;
+            border-radius: var(--radius-full);
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+            transition: var(--transition-base);
+        }
+
+        .header .ai-badge:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .ai-badge .pulse {
+            width: 10px;
+            height: 10px;
+            background: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 15px var(--success), 0 0 30px var(--success);
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+                transform: scale(1);
+                box-shadow: 0 0 15px var(--success), 0 0 30px var(--success);
+            }
+            50% {
+                opacity: 0.7;
+                transform: scale(1.3);
+                box-shadow: 0 0 20px var(--success), 0 0 40px var(--success);
+            }
+        }
+
+        /* ===== Stats Grid - 精致卡片 ===== */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 1400px) {
+            .stats-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 600px) {
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.08) 0%,
+                rgba(255, 255, 255, 0.03) 100%);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-xl);
+            padding: 1.25rem 1.5rem;
+            position: relative;
+            overflow: hidden;
+            transition: all var(--transition-slow);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* 顶部渐变光线 - 已移除 */
+        .stat-card::before {
+            display: none;
+        }
+
+        @keyframes shimmer {
+            0%, 100% {
+                transform: translateX(-100%);
+                opacity: 0.4;
+            }
+            50% {
+                transform: translateX(100%);
+                opacity: 0.8;
+            }
+        }
+
+        /* 内部高光 */
+        .stat-card::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle,
+                rgba(255, 255, 255, 0.1) 0%,
+                transparent 60%);
+            opacity: 0;
+            transition: var(--transition-slow);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px) scale(1.02);
+            border-color: var(--primary);
+            box-shadow: var(--shadow-xl), var(--shadow-glow);
+        }
+
+        .stat-card:hover::after {
+            opacity: 1;
+        }
+
+        .stat-card h3 {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 900;
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg,
+                var(--primary) 0%,
+                var(--primary-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+            letter-spacing: -0.02em;
+            transition: var(--transition-base);
+        }
+
+        .stat-card .value.positive {
+            background: linear-gradient(135deg,
+                var(--success) 0%,
+                var(--success-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: valueGlow 2s ease-in-out infinite;
+        }
+
+        .stat-card .value.negative {
+            background: linear-gradient(135deg,
+                var(--danger) 0%,
+                var(--danger-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        @keyframes valueGlow {
+            0%, 100% {
+                filter: drop-shadow(0 0 8px rgba(16, 185, 129, 0.5));
+            }
+            50% {
+                filter: drop-shadow(0 0 12px rgba(16, 185, 129, 0.8));
+            }
+        }
+
+        /* ===== Positions Container - 3D 立体感 ===== */
+        .positions-container {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.08) 0%,
+                rgba(255, 255, 255, 0.03) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            margin-bottom: 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* 容器顶部装饰线 - 已移除 */
+        .positions-container::before {
+            display: none;
+        }
+
+        .positions-container h2,
+        .chart-container h2,
+        .trades-container h2 {
+            font-size: 0.85rem;
+            font-weight: 800;
+            margin-bottom: 0.65rem;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            letter-spacing: -0.02em;
+        }
+
+        .positions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 0.75rem;
+        }
+
+        .position-card {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.06) 0%,
+                rgba(255, 255, 255, 0.02) 100%);
+            border: 1.5px solid rgba(255, 255, 255, 0.08);
+            border-radius: var(--radius-md);
+            padding: 0.85rem;
+            transition: all var(--transition-slow);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* 卡片内部光晕 */
+        .position-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            opacity: 0;
+            transition: var(--transition-base);
+        }
+
+        .position-card:hover {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.1) 0%,
+                rgba(255, 255, 255, 0.05) 100%);
+            transform: translateY(-4px) scale(1.02);
+            box-shadow: var(--shadow-xl);
+            border-color: var(--primary);
+        }
+
+        .position-card:hover::before {
+            opacity: 1;
+        }
+
+        .position-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.85rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1.5px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .position-symbol {
+            font-size: 1rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.02em;
+        }
+
+        .position-side {
+            padding: 0.35rem 0.65rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.7rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition-base);
+        }
+
+        .position-side.long {
+            background: linear-gradient(135deg,
+                rgba(16, 185, 129, 0.2),
+                rgba(16, 185, 129, 0.1));
+            color: var(--success-light);
+            border: 1.5px solid var(--success);
+        }
+
+        .position-side.short {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.2),
+                rgba(239, 68, 68, 0.1));
+            color: var(--danger-light);
+            border: 1.5px solid var(--danger);
+        }
+
+        .position-side:hover {
+            transform: scale(1.05);
+            box-shadow: var(--shadow-md);
+        }
+
+        .position-info {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+            margin-bottom: 0.85rem;
+        }
+
+        .position-info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        .position-info-label {
+            font-size: 0.65rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.15rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-weight: 600;
+        }
+
+        .position-info-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+        }
+
+        .position-pnl {
+            padding: 0.75rem;
+            border-radius: var(--radius-md);
+            text-align: center;
+            margin-top: 0.75rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .position-pnl::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, transparent 0%, rgba(255, 255, 255, 0.05) 100%);
+            opacity: 0;
+            transition: var(--transition-base);
+        }
+
+        .position-pnl:hover::before {
+            opacity: 1;
+        }
+
+        .position-pnl.positive {
+            background: linear-gradient(135deg,
+                rgba(16, 185, 129, 0.15),
+                rgba(16, 185, 129, 0.05));
+            border: 1.5px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .position-pnl.negative {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.15),
+                rgba(239, 68, 68, 0.05));
+            border: 1.5px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .position-pnl-value {
+            font-size: 1.2rem;
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 0.3rem;
+            letter-spacing: -0.02em;
+        }
+
+        .position-pnl-pct {
+            font-size: 0.8rem;
+            opacity: 0.9;
+            font-weight: 600;
+        }
+
+        .no-positions {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        /* ===== Chart & Trades Container ===== */
+        .chart-container,
+        .trades-container {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.08) 0%,
+                rgba(255, 255, 255, 0.03) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 0.75rem;
+            margin-bottom: 0;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* 图表和交易容器顶部装饰线 - 已移除 */
+        .chart-container::before,
+        .trades-container::before {
+            display: none;
+        }
+
+        /* ===== Table 精致化 ===== */
+        .table-wrapper {
+            overflow-x: auto;
+            border-radius: var(--radius-lg);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 0.5rem 0.6rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+            font-size: 0.75rem;
+        }
+
+        th {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.08),
+                rgba(255, 255, 255, 0.04));
+            font-weight: 700;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-secondary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        td {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.75rem;
+            font-weight: 500;
+        }
+
+        tbody tr {
+            transition: all var(--transition-fast);
+        }
+
+        tbody tr:hover {
+            background: linear-gradient(135deg,
+                rgba(45, 212, 191, 0.08),
+                rgba(45, 212, 191, 0.02));
+        }
+
+        /* ===== Badge 精致化 ===== */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.35rem 0.65rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition-base);
+        }
+
+        .badge:hover {
+            transform: scale(1.05);
+        }
+
+        .badge-long {
+            background: linear-gradient(135deg,
+                rgba(16, 185, 129, 0.25),
+                rgba(16, 185, 129, 0.1));
+            color: var(--success-light);
+            border: 1.5px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .badge-short {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.25),
+                rgba(239, 68, 68, 0.1));
+            color: var(--danger-light);
+            border: 1.5px solid rgba(239, 68, 68, 0.4);
+        }
+
+        /* ===== Footer ===== */
+
+        /* ========== 工具提示样式 ========== */
+        [data-tooltip] {
+            position: relative;
+            cursor: help;
+        }
+
+        [data-tooltip]:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(-8px);
+            background: linear-gradient(135deg, #1a1b2e, #16213e);
+            color: #E0E0E0;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            z-index: 10000;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(94, 234, 212, 0.3);
+            animation: tooltipFadeIn 0.2s ease;
+        }
+
+        [data-tooltip]:hover::before {
+            content: '';
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%) translateY(0px);
+            border: 6px solid transparent;
+            border-top-color: #1a1b2e;
+            z-index: 10001;
+        }
+
+        @keyframes tooltipFadeIn {
+            from {
+                opacity: 0;
+                transform: translateX(-50%) translateY(-12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateX(-50%) translateY(-8px);
+            }
+
+        /* 禁用决策卡片及其子元素的工具提示功能 */
+        .decision-card [data-tooltip],
+        .decision-card[data-tooltip],
+        #decisions-container [data-tooltip] {
+            cursor: default;
+        }
+
+        .decision-card [data-tooltip]:hover::after,
+        .decision-card [data-tooltip]:hover::before,
+        .decision-card[data-tooltip]:hover::after,
+        .decision-card[data-tooltip]:hover::before,
+        #decisions-container [data-tooltip]:hover::after,
+        #decisions-container [data-tooltip]:hover::before {
+            content: none;
+            display: none;
+        }
+
+
+        }
+        .footer {
+            text-align: center;
+            color: var(--text-secondary);
+            margin-top: 4rem;
+            padding: 2.5rem;
+            font-size: 0.95rem;
+        }
+
+        .footer .update-time {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.08),
+                rgba(255, 255, 255, 0.04));
+            border: 1.5px solid var(--glass-border);
+            backdrop-filter: blur(16px);
+            padding: 0.75rem 1.5rem;
+            border-radius: var(--radius-full);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            box-shadow: var(--shadow-md);
+            transition: var(--transition-base);
+        }
+
+        .footer .update-time:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        /* ===== Loading 动画 ===== */
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+            animation: loadingPulse 1.5s ease-in-out infinite;
+            font-weight: 500;
+        }
+
+        @keyframes loadingPulse {
+            0%, 100% { opacity: 0.4; transform: scale(1); }
+            50% { opacity: 1; transform: scale(1.02); }
+        }
+
+        /* ===== AI Decision Cards - 奢华版 ===== */
+        .decision-card {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.06) 0%,
+                rgba(255, 255, 255, 0.02) 100%);
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-lg);
+            padding: 1rem 1.25rem;
+            transition: all var(--transition-slow);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            margin-bottom: 0.75rem;
+        }
+
+        .decision-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2.5px;
+            opacity: 1;
+            transition: var(--transition-base);
+        }
+
+        .decision-card:hover {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.1) 0%,
+                rgba(255, 255, 255, 0.05) 100%);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .decision-card.collapsed .decision-details {
+            display: none;
+        }
+
+        .decision-card.collapsed {
+            padding-bottom: 1rem;
+        }
+
+        .decision-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .decision-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 1.2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .decision-time {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.8rem;
+            color: var(--text-tertiary);
+            font-weight: 500;
+        }
+
+        .decision-action {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin: 0.75rem 0;
+        }
+
+        .decision-action .action-badge {
+            padding: 0.55rem 1.1rem;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            box-shadow: var(--shadow-sm);
+            transition: var(--transition-base);
+        }
+
+        .decision-action .action-badge:hover {
+            transform: scale(1.05);
+        }
+
+        .decision-action .action-badge.hold {
+            background: linear-gradient(135deg,
+                rgba(245, 158, 11, 0.25),
+                rgba(245, 158, 11, 0.1));
+            color: var(--warning);
+            border: 1.5px solid rgba(245, 158, 11, 0.4);
+        }
+
+        .decision-action .action-badge.buy {
+            background: linear-gradient(135deg,
+                rgba(16, 185, 129, 0.25),
+                rgba(16, 185, 129, 0.1));
+            color: var(--success-light);
+            border: 1.5px solid rgba(16, 185, 129, 0.4);
+        }
+
+        .decision-action .action-badge.sell {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.25),
+                rgba(239, 68, 68, 0.1));
+            color: var(--danger-light);
+            border: 1.5px solid rgba(239, 68, 68, 0.4);
+        }
+
+        .decision-action .action-badge.close {
+            background: linear-gradient(135deg,
+                rgba(160, 160, 184, 0.25),
+                rgba(160, 160, 184, 0.1));
+            color: var(--text-secondary);
+            border: 1.5px solid rgba(160, 160, 184, 0.4);
+        }
+
+        .decision-confidence {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.95rem;
+            color: var(--success-light);
+            font-weight: 700;
+        }
+
+        .decision-summary {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: rgba(255, 255, 255, 0.95);
+            margin: 0.75rem 0 0.5rem 0;
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+            font-weight: 500;
+        }
+
+        .decision-expand-hint {
+            font-size: 0.65rem;
+            color: var(--text-tertiary);
+            font-style: italic;
+            margin-top: 0.5rem;
+            opacity: 0.5;
+            transition: opacity var(--transition-base);
+            letter-spacing: 0.03em;
+        }
+
+        .decision-card:hover .decision-expand-hint {
+            opacity: 0.8;
+        }
+
+        .decision-main-action {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            margin: 0 0.5rem;
+        }
+
+        .decision-details {
+            margin-top: 1rem;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from {
+                opacity: 0;
+                transform: translateY(-10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .decision-reasoning {
+            background: linear-gradient(135deg,
+                rgba(0, 0, 0, 0.4),
+                rgba(0, 0, 0, 0.2));
+            border-left: 3px solid var(--secondary);
+            padding: 1rem;
+            border-radius: var(--radius-md);
+            font-size: 0.85rem;
+            line-height: 1.7;
+            color: var(--text-primary);
+            margin-top: 0.75rem;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        /* ===== 两栏布局 ===== */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 420px;
+            gap: 1.5rem;
+            margin-top: 0;
+            align-items: start;
+        }
+
+        .content-left {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        .content-right {
+            position: sticky;
+            top: 1rem;
+            height: fit-content;
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+        }
+
+        /* AI决策侧边栏 */
+        .decisions-sidebar {
+            background: linear-gradient(135deg,
+                rgba(30, 30, 40, 0.8),
+                rgba(20, 20, 30, 0.6));
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-2xl);
+            padding: 2rem;
+            box-shadow: var(--shadow-xl);
+        }
+
+        /* 决策侧边栏顶部装饰线 - 已移除 */
+        .decisions-sidebar::before {
+            display: none;
+        }
+
+        .decisions-sidebar h2 {
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin: 0 0 0.8rem 0;
+            background: linear-gradient(135deg,
+                var(--primary),
+                var(--secondary),
+                var(--accent));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            letter-spacing: 0.02em;
+            opacity: 0.8;
+        }
+
+        /* AI决策容器 */
+        #decisions-container {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            padding-left: 35px;
+            position: relative;
+        }
+
+        /* 时间线连接线 */
+        .decision-card::before {
+            content: '';
+            position: absolute;
+            left: -22px;
+            top: 0;
+            bottom: -1.25rem;
+            width: 2.5px;
+            background: linear-gradient(180deg,
+                var(--primary) 0%,
+                var(--secondary) 50%,
+                transparent 100%);
+            opacity: 0.4;
+        }
+
+        .decision-card:last-child::before {
+            bottom: 50%;
+        }
+
+        /* 时间线节点 */
+        .decision-card::after {
+            content: '';
+            position: absolute;
+            left: -29px;
+            top: 1.75rem;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--primary);
+            box-shadow: 0 0 15px var(--glow-primary),
+                        0 0 25px var(--glow-primary);
+            border: 3px solid var(--bg-dark);
+            animation: nodeGlow 3s ease-in-out infinite;
+        }
+
+        @keyframes nodeGlow {
+            0%, 100% {
+                transform: scale(1);
+                box-shadow: 0 0 15px var(--glow-primary),
+                            0 0 25px var(--glow-primary);
+            }
+            50% {
+                transform: scale(1.2);
+                box-shadow: 0 0 20px var(--glow-primary),
+                            0 0 35px var(--glow-primary);
+            }
+        }
+
+        /* 推理模型节点 */
+        .decision-card[data-model="reasoner"]::after {
+            background: #8B7FD8;
+            box-shadow: 0 0 15px rgba(139, 127, 216, 0.8),
+                        0 0 25px rgba(139, 127, 216, 0.6);
+        }
+
+        .decision-card[data-model="reasoner"]::before {
+            background: linear-gradient(180deg,
+                #8B7FD8 0%,
+                #A78BFA 50%,
+                transparent 100%);
+        }
+
+        /* 日常模型节点 */
+        .decision-card[data-model="chat"]::after {
+            background: #2DD4BF;
+            box-shadow: 0 0 15px rgba(45, 212, 191, 0.8),
+                        0 0 25px rgba(45, 212, 191, 0.6);
+        }
+
+        .decision-card[data-model="chat"]::before {
+            background: linear-gradient(180deg,
+                #2DD4BF 0%,
+                #5EEAD4 50%,
+                transparent 100%);
+        }
+
+        /* ===== 按钮美化 ===== */
+        button {
+            padding: 0.7rem 1.5rem;
+            background: linear-gradient(135deg,
+                rgba(45, 212, 191, 0.2),
+                rgba(45, 212, 191, 0.1));
+            border: 1.5px solid var(--primary);
+            color: var(--primary);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            transition: all var(--transition-base);
+            box-shadow: var(--shadow-sm);
+        }
+
+        button:hover:not(:disabled) {
+            background: linear-gradient(135deg,
+                rgba(45, 212, 191, 0.3),
+                rgba(45, 212, 191, 0.15));
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        /* ===== 响应式设计 ===== */
+        @media (max-width: 1400px) {
+            .main-content {
+                grid-template-columns: 1fr 380px;
+            }
+        }
+
+        @media (max-width: 1200px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+
+            .content-right {
+                position: relative;
+                max-height: none;
+            }
+
+            .decision-card::before,
+            .decision-card::after {
+                display: none;
+            }
+
+            #decisions-container {
+                padding-left: 0;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 1.5rem;
+            }
+
+            .stats-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .stat-card .value {
+                font-size: 1.75rem;
+            }
+
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .positions-container,
+            .chart-container,
+            .trades-container {
+                padding: 1.5rem;
+            }
+
+            table {
+                font-size: 0.8rem;
+            }
+
+            th, td {
+                padding: 0.9rem 0.6rem;
+            }
+        }
+
+        /* ===== Scrollbar 美化 ===== */
+        ::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--bg-darker);
+            border-radius: var(--radius-sm);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: linear-gradient(180deg,
+                var(--primary),
+                var(--secondary));
+            border-radius: var(--radius-sm);
+            box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: linear-gradient(180deg,
+                var(--primary-light),
+                var(--secondary-light));
+        }
+
+        /* ===== 实时价格Ticker栏 ===== */
+        .price-ticker {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.08) 0%,
+                rgba(255, 255, 255, 0.03) 100%);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1.5px solid var(--glass-border);
+            border-radius: var(--radius-md);
+            padding: 0.3rem 0.5rem;
+            margin-bottom: 0.85rem;
+            position: relative;
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+
+        /* 价格ticker顶部装饰线 - 已移除 */
+        .price-ticker::before {
+            display: none;
+        }
+
+        .ticker-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 0.35rem;
+        }
+
+        .ticker-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+            padding: 0.3rem 0.35rem;
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.04),
+                rgba(255, 255, 255, 0.01));
+            border-radius: var(--radius-sm);
+            transition: all var(--transition-base);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .ticker-price-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.3rem;
+        }
+
+        .ticker-item::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--primary), transparent);
+            opacity: 0;
+            transition: var(--transition-base);
+        }
+
+        .ticker-item:hover {
+            background: linear-gradient(135deg,
+                rgba(255, 255, 255, 0.08),
+                rgba(255, 255, 255, 0.03));
+            transform: translateY(-2px);
+        }
+
+        .ticker-item:hover::before {
+            opacity: 1;
+        }
+
+        .ticker-symbol {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-secondary);
+            letter-spacing: 0.05em;
+            opacity: 0.85;
+        }
+
+        .ticker-price {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            font-weight: 800;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            flex: 1;
+        }
+
+        .ticker-price .price-arrow {
+            font-size: 0.7rem;
+            transition: all var(--transition-base);
+        }
+
+        .ticker-change {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.2rem 0.35rem;
+            border-radius: var(--radius-sm);
+            display: inline-block;
+            width: fit-content;
+            white-space: nowrap;
+        }
+
+        .ticker-change.positive {
+            background: linear-gradient(135deg,
+                rgba(16, 185, 129, 0.2),
+                rgba(16, 185, 129, 0.1));
+            color: var(--success-light);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .ticker-change.negative {
+            background: linear-gradient(135deg,
+                rgba(239, 68, 68, 0.2),
+                rgba(239, 68, 68, 0.1));
+            color: var(--danger-light);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .ticker-item.price-up {
+            animation: priceFlashGreen 0.5s ease-out;
+        }
+
+        .ticker-item.price-down {
+            animation: priceFlashRed 0.5s ease-out;
+        }
+
+        @keyframes priceFlashGreen {
+            0%, 100% { background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)); }
+            50% { background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(16, 185, 129, 0.1)); }
+        }
+
+        @keyframes priceFlashRed {
+            0%, 100% { background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)); }
+            50% { background: linear-gradient(135deg, rgba(239, 68, 68, 0.2), rgba(239, 68, 68, 0.1)); }
+        }
+
+        /* Ticker响应式 */
+        @media (max-width: 1400px) {
+            .ticker-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .ticker-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        /* ===== 页面加载动画 ===== */
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .container > * {
+            animation: fadeInUp 0.6s ease-out backwards;
+        }
+
+        .container > *:nth-child(1) { animation-delay: 0.1s; }
+        .container > *:nth-child(2) { animation-delay: 0.2s; }
+        .container > *:nth-child(3) { animation-delay: 0.3s; }
+
+        /* ===== 清算价预警区域样式 ===== */
+        .liquidation-warnings {
+            margin-bottom: 1.5rem;
+            padding: 1rem;
+            border-radius: 12px;
+            background: linear-gradient(135deg,
+                rgba(255, 107, 107, 0.15) 0%,
+                rgba(255, 61, 61, 0.1) 100%);
+            border: 2px solid rgba(255, 107, 107, 0.4);
+            box-shadow: 0 4px 20px rgba(255, 61, 61, 0.2);
+            animation: pulse-warning 2s infinite;
+            display: none; /* 默认隐藏，有预警时显示 */
+        }
+
+        .liquidation-warnings.has-critical {
+            background: linear-gradient(135deg,
+                rgba(255, 0, 0, 0.2) 0%,
+                rgba(255, 61, 61, 0.15) 100%);
+            border-color: rgba(255, 0, 0, 0.6);
+            box-shadow: 0 4px 30px rgba(255, 0, 0, 0.4);
+            animation: pulse-critical 1s infinite;
+        }
+
+        @keyframes pulse-warning {
+            0%, 100% {
+                border-color: rgba(255, 107, 107, 0.4);
+                box-shadow: 0 4px 20px rgba(255, 61, 61, 0.2);
+            }
+            50% {
+                border-color: rgba(255, 107, 107, 0.7);
+                box-shadow: 0 4px 30px rgba(255, 61, 61, 0.4);
+            }
+        }
+
+        @keyframes pulse-critical {
+            0%, 100% {
+                border-color: rgba(255, 0, 0, 0.6);
+                box-shadow: 0 4px 30px rgba(255, 0, 0, 0.4);
+            }
+            50% {
+                border-color: rgba(255, 0, 0, 0.9);
+                box-shadow: 0 4px 40px rgba(255, 0, 0, 0.6);
+            }
+        }
+
+        .liquidation-warnings h3 {
+            margin: 0 0 0.8rem 0;
+            font-size: 1.1rem;
+            color: #ff6b6b;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .liquidation-warnings.has-critical h3 {
+            color: #ff0000;
+        }
+
+        .warning-item {
+            background: rgba(0, 0, 0, 0.3);
+            border-left: 4px solid #ff6b6b;
+            padding: 0.8rem;
+            margin-bottom: 0.6rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+
+        .warning-item.critical {
+            border-left-color: #ff0000;
+            background: rgba(255, 0, 0, 0.1);
+        }
+
+        .warning-item.high {
+            border-left-color: #ff9800;
+        }
+
+        .warning-message {
+            font-weight: 700;
+            margin-bottom: 0.3rem;
+            color: #fff;
+        }
+
+        .warning-details {
+            font-size: 0.85rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        /* ===== 底部状态栏样式 ===== */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 50px;
+            background: rgba(10, 10, 15, 0.98);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-top: 1px solid rgba(45, 212, 191, 0.2);
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 3rem;
+            z-index: 10000;
+            font-family: 'JetBrains Mono', monospace;
+            padding: 0 2rem;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: transform 0.2s ease;
+        }
+
+        .status-item:hover {
+            transform: translateY(-2px);
+        }
+
+        .status-icon {
+            font-size: 1.2rem;
+            filter: drop-shadow(0 0 8px currentColor);
+        }
+
+        .status-label {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-value {
+            color: var(--primary);
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-shadow: 0 0 10px var(--glow-primary);
+        }
+
+        .status-live {
+            color: var(--success);
+            animation: pulse-glow 2s infinite;
+            font-weight: 900;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% {
+                opacity: 1;
+                text-shadow: 0 0 10px var(--success), 0 0 20px var(--success);
+            }
+            50% {
+                opacity: 0.7;
+                text-shadow: 0 0 5px var(--success);
+            }
+        }
+
+        /* 确保主内容区域底部有足够空间 */
+        .container {
+            padding-bottom: 70px !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="header-left">
+                <h1>⚡ ALPHA ARENA</h1>
+                <p class="subtitle">DeepSeek-V3 UltraThink</p>
+            </div>
+            <div class="ai-badge">
+                <span class="pulse"></span>
+                <span>AI LIVE TRADING</span>
+            </div>
+        </div>
+
+        <!-- 实时价格Ticker -->
+        <div class="price-ticker">
+            <div class="ticker-grid">
+                <div class="ticker-item" data-symbol="BTCUSDT">
+                    <div class="ticker-symbol">BTC/USDT</div>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-BTCUSDT">--</span>
+                            <span class="price-arrow" id="arrow-BTCUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-BTCUSDT">0.00%</div>
+                    </div>
+                </div>
+
+                <div class="ticker-item" data-symbol="ETHUSDT">
+                    <div class="ticker-symbol">ETH/USDT</div>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-ETHUSDT">--</span>
+                            <span class="price-arrow" id="arrow-ETHUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-ETHUSDT">0.00%</div>
+                    </div>
+                </div>
+
+                <div class="ticker-item" data-symbol="BNBUSDT">
+                    <div class="ticker-symbol">BNB/USDT</div>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-BNBUSDT">--</span>
+                            <span class="price-arrow" id="arrow-BNBUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-BNBUSDT">0.00%</div>
+                    </div>
+                </div>
+
+                <div class="ticker-item" data-symbol="SOLUSDT">
+                    <div class="ticker-symbol">SOL/USDT</div>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-SOLUSDT">--</span>
+                            <span class="price-arrow" id="arrow-SOLUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-SOLUSDT">0.00%</div>
+                    </div>
+                </div>
+
+                <div class="ticker-item" data-symbol="XRPUSDT">
+                    <div class="ticker-symbol">XRP/USDT</div>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-XRPUSDT">--</span>
+                            <span class="price-arrow" id="arrow-XRPUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-XRPUSDT">0.00%</div>
+                    </div>
+                </div>
+
+                <div class="ticker-item" data-symbol="ADAUSDT">
+                    <div class="ticker-symbol">ADA/USDT</div>
+                    <div class="ticker-price-row">
+                        <div class="ticker-price">
+                            <span id="price-ADAUSDT">--</span>
+                            <span class="price-arrow" id="arrow-ADAUSDT"></span>
+                        </div>
+                        <div class="ticker-change" id="change-ADAUSDT">0.00%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 两栏布局 -->
+        <div class="main-content">
+            <!-- 左侧内容 -->
+            <div class="content-left">
+                <!-- 性能指标卡片 -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>💰 账户价值</h3>
+                        <div class="value" id="account-value">$0</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📈 总回报率</h3>
+                        <div class="value" id="total-return">0%</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📊 夏普比率</h3>
+                        <div class="value" id="sharpe-ratio">0.00</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📉 最大回撤</h3>
+                        <div class="value negative" id="max-drawdown">0%</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>🎯 胜率</h3>
+                        <div class="value" id="win-rate">0%</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>🔢 总交易笔数</h3>
+                        <div class="value" id="total-trades">0</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>📍 持仓数量</h3>
+                        <div class="value" id="open-positions">0</div>
+                    </div>
+
+                    <div class="stat-card">
+                        <h3>💵 未实现盈亏</h3>
+                        <div class="value" id="unrealized-pnl">$0</div>
+                    </div>
+                </div>
+
+                <!-- 清算价预警 -->
+                <div id="liquidation-warnings" class="liquidation-warnings">
+                    <h3>🚨 清算风险预警</h3>
+                    <div id="warnings-list">
+                        <!-- 动态加载预警信息 -->
+                    </div>
+                </div>
+
+                <!-- 当前持仓 -->
+                <div class="positions-container">
+                    <h2>📍 当前持仓</h2>
+                    <div id="positions-grid" class="positions-grid">
+                        <div class="loading">正在加载持仓信息...</div>
+                    </div>
+                </div>
+
+                <!-- 图表 -->
+                <div class="chart-container">
+                    <h2>📈 账户价值曲线</h2>
+                    <div style="height: 250px; position: relative;">
+                        <canvas id="performanceChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- 交易记录 -->
+                <div class="trades-container">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem;">
+                        <h2 style="margin: 0;">🔥 最近交易记录</h2>
+                        <div style="display: flex; gap: 12px; align-items: center;">
+                            <button id="prev-page">← 上一页</button>
+                            <span id="page-info" style="color: var(--text-secondary); font-size: 0.9rem; font-weight: 600;">第 1 页</span>
+                            <button id="next-page">下一页 →</button>
+                        </div>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>时间</th>
+                                    <th>交易对</th>
+                                    <th>操作</th>
+                                    <th>数量</th>
+                                    <th>价格</th>
+                                    <th>杠杆</th>
+                                    <th>信心度</th>
+                                    <th>盈亏</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trades-tbody">
+                                <tr>
+                                    <td colspan="8" class="loading">正在初始化AI交易系统...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右侧AI决策 -->
+            <div class="content-right">
+                <div class="decisions-sidebar">
+                    <h2>DeepSeek 决策</h2>
+                    <div id="decisions-container">
+                        <div class="loading">正在加载AI决策...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <div class="update-time">
+                <span>⏱</span>
+                <span>最后更新: <span id="last-update">-</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Socket.IO 客户端库 -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <script>
+        // ==================== 数据状态管理系统 ====================
+        const AppState = {
+            performance: {
+                account_value: 0,
+                wallet_balance: 0,
+                total_return_pct: 0,
+                sharpe_ratio: 0,
+                max_drawdown_pct: 0,
+                win_rate_pct: 0,
+                total_trades: 0,
+                open_positions: 0,
+                unrealized_pnl: 0,
+                realized_pnl: 0,
+                timestamp: null
+            },
+            positions: [],
+            decisions: [],
+            trades: [],
+            chartData: [],
+
+            updatePerformance(data) {
+                this.performance = { ...this.performance, ...data };
+                this.performance.timestamp = Date.now();
+            },
+
+            updatePositions(positions) {
+                this.positions = positions || [];
+            },
+
+            updateDecisions(decisions) {
+                if (!decisions) {
+                    this.decisions = [];
+                    return;
+                }
+
+                const now = new Date();
+                const thirtyMinutesAgo = new Date(now.getTime() - 30 * 60 * 1000);
+
+                this.decisions = decisions.filter(decision => {
+                    if (!decision.time) return false;
+                    try {
+                        const decisionTime = new Date(decision.time.replace(',', '.'));
+                        return decisionTime >= thirtyMinutesAgo;
+                    } catch (e) {
+                        return true;
+                    }
+                }).sort((a, b) => {
+                    try {
+                        const timeA = new Date(a.time.replace(',', '.'));
+                        const timeB = new Date(b.time.replace(',', '.'));
+                        return timeB - timeA;
+                    } catch (e) {
+                        return 0;
+                    }
+                });
+            },
+
+            updateTrades(trades) {
+                this.trades = trades || [];
+            },
+
+            updateChartData(data) {
+                this.chartData = data || [];
+            },
+
+            getSnapshot() {
+                return {
+                    performance: { ...this.performance },
+                    positions: [...this.positions],
+                    decisions: [...this.decisions],
+                    trades: [...this.trades],
+                    chartData: [...this.chartData]
+                };
+            }
+        };
+
+        // ==================== 全局变量 ====================
+        let chart = null;
+        let previousValues = {};
+        let previousPrices = {};
+        let socket = null;
+
+        // 🔊 音效系统
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        function playProfitSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 880;
+            oscillator.type = 'sine';
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.3);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.3);
+        }
+
+        function playLossSound() {
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            oscillator.frequency.value = 220;
+            oscillator.type = 'sawtooth';
+
+            gainNode.gain.setValueAtTime(0.2, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.4);
+        }
+
+        // 🎯 数字跳动动画函数
+        function animateNumber(element, targetValue, options = {}) {
+            const {
+                duration = 800,
+                decimals = 2,
+                prefix = '',
+                suffix = '',
+                useLocale = false,
+                className = '',
+                isPercentage = false
+            } = options;
+
+            const elementId = element.id;
+            const currentValue = previousValues[elementId] || 0;
+
+            if (currentValue === targetValue) return;
+
+            const startValue = parseFloat(currentValue) || 0;
+            const endValue = parseFloat(targetValue) || 0;
+            const diff = endValue - startValue;
+            const startTime = performance.now();
+
+            element.style.transition = 'all 0.2s ease';
+            element.style.transform = 'scale(1.05)';
+
+            setTimeout(() => {
+                element.style.transform = 'scale(1)';
+            }, 150);
+
+            function animate(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                const eased = 1 - Math.pow(1 - progress, 3);
+                const current = startValue + (diff * eased);
+
+                let displayValue;
+                if (useLocale) {
+                    displayValue = current.toLocaleString('en-US', {
+                        minimumFractionDigits: decimals,
+                        maximumFractionDigits: decimals
+                    });
+                } else {
+                    displayValue = current.toFixed(decimals);
+                }
+
+                if (isPercentage && current > 0) {
+                    displayValue = '+' + displayValue;
+                }
+
+                element.textContent = prefix + displayValue + suffix;
+
+                if (className) {
+                    element.className = className;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    previousValues[elementId] = endValue;
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+
+        // Toggle decision card collapse/expand
+        function toggleDecisionCard(card) {
+            event.stopPropagation();
+            card.classList.toggle('collapsed');
+
+            // Update hint text
+            const hint = card.querySelector('.decision-expand-hint');
+            if (hint) {
+                hint.textContent = card.classList.contains('collapsed') ? 'click to expand' : 'click to collapse';
+            }
+        }
+
+        // Update performance metrics
+        function updatePerformance() {
+            fetch('/api/performance')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const data = result.data;
+
+                        animateNumber(document.getElementById('account-value'), data.account_value, {
+                            prefix: '$',
+                            useLocale: true,
+                            decimals: 2
+                        });
+
+                        const returnElem = document.getElementById('total-return');
+                        const returnValue = data.total_return_pct;
+                        animateNumber(returnElem, returnValue, {
+                            suffix: '%',
+                            decimals: 2,
+                            isPercentage: true,
+                            className: 'value ' + (returnValue >= 0 ? 'positive' : 'negative')
+                        });
+
+                        const sharpeElem = document.getElementById('sharpe-ratio');
+                        animateNumber(sharpeElem, data.sharpe_ratio, {
+                            decimals: 2,
+                            className: 'value ' + (data.sharpe_ratio >= 1 ? 'positive' : '')
+                        });
+
+                        animateNumber(document.getElementById('max-drawdown'), data.max_drawdown_pct, {
+                            suffix: '%',
+                            decimals: 2
+                        });
+
+                        const winRateElem = document.getElementById('win-rate');
+                        animateNumber(winRateElem, data.win_rate_pct, {
+                            suffix: '%',
+                            decimals: 2,
+                            className: 'value ' + (data.win_rate_pct >= 50 ? 'positive' : '')
+                        });
+
+                        animateNumber(document.getElementById('total-trades'), data.total_trades, {
+                            decimals: 0
+                        });
+
+                        animateNumber(document.getElementById('open-positions'), data.open_positions, {
+                            decimals: 0
+                        });
+
+                        const pnlElem = document.getElementById('unrealized-pnl');
+                        animateNumber(pnlElem, data.unrealized_pnl, {
+                            prefix: '$',
+                            decimals: 2,
+                            isPercentage: true,
+                            className: 'value ' + (data.unrealized_pnl >= 0 ? 'positive' : 'negative')
+                        });
+
+                        document.getElementById('last-update').textContent =
+                            new Date(data.last_update).toLocaleString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                second: '2-digit'
+                            });
+                    }
+                })
+                .catch(error => console.error('Performance update error:', error));
+        }
+
+        // Update chart
+        function updateChart() {
+            fetch('/api/chart')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const data = result.data;
+
+                        if (data.length === 0) {
+                            const now = new Date();
+                            data.push({ time: now.toISOString(), value: 20 });
+                        }
+
+                        const labels = data.map(d => {
+                            const date = new Date(d.time);
+                            return date.toLocaleTimeString('zh-CN', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            });
+                        });
+                        const values = data.map(d => d.value);
+
+                        const initialCapital = 20;
+                        const baseline = new Array(values.length).fill(initialCapital);
+
+                        if (chart) {
+                            chart.destroy();
+                        }
+
+                        const ctx = document.getElementById('performanceChart').getContext('2d');
+
+                        const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                        gradient.addColorStop(0, 'rgba(45, 212, 191, 0.3)');
+                        gradient.addColorStop(1, 'rgba(45, 212, 191, 0.0)');
+
+                        chart = new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [
+                                    {
+                                        label: '初始资金',
+                                        data: baseline,
+                                        borderColor: 'rgba(160, 160, 184, 0.4)',
+                                        backgroundColor: 'transparent',
+                                        borderWidth: 2,
+                                        borderDash: [5, 5],
+                                        tension: 0,
+                                        fill: false,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 0
+                                    },
+                                    {
+                                        label: 'DeepSeek V3 表现',
+                                        data: values,
+                                        borderColor: '#2DD4BF',
+                                        backgroundColor: gradient,
+                                        borderWidth: 3,
+                                        tension: 0.4,
+                                        fill: true,
+                                        pointRadius: 0,
+                                        pointHoverRadius: 8,
+                                        pointBackgroundColor: '#2DD4BF',
+                                        pointBorderColor: '#0A0A0F',
+                                        pointBorderWidth: 3
+                                    }
+                                ]
+                            },
+                            options: {
+                                responsive: true,
+                                maintainAspectRatio: false,
+                                animation: false,
+                                interaction: {
+                                    intersect: false,
+                                    mode: 'index'
+                                },
+                                plugins: {
+                                    legend: {
+                                        display: true,
+                                        position: 'top',
+                                        labels: {
+                                            color: '#A8B0C8',
+                                            font: {
+                                                family: 'Inter',
+                                                size: 12,
+                                                weight: '600'
+                                            },
+                                            padding: 15,
+                                            usePointStyle: true,
+                                            pointStyle: 'line'
+                                        }
+                                    },
+                                    tooltip: {
+                                        backgroundColor: 'rgba(10, 10, 15, 0.95)',
+                                        titleColor: '#2DD4BF',
+                                        bodyColor: '#FFFFFF',
+                                        borderColor: '#2DD4BF',
+                                        borderWidth: 1.5,
+                                        padding: 15,
+                                        displayColors: true,
+                                        callbacks: {
+                                            label: function(context) {
+                                                const label = context.dataset.label || '';
+                                                const value = context.parsed.y;
+                                                const diff = value - initialCapital;
+                                                const diffPct = ((diff / initialCapital) * 100).toFixed(2);
+                                                const sign = diff >= 0 ? '+' : '';
+                                                return label + ': $' + value.toFixed(2) +
+                                                       ' (' + sign + diffPct + '%)';
+                                            }
+                                        }
+                                    }
+                                },
+                                scales: {
+                                    x: {
+                                        grid: {
+                                            color: 'rgba(255, 255, 255, 0.05)',
+                                            drawBorder: false
+                                        },
+                                        ticks: {
+                                            color: '#A8B0C8',
+                                            maxTicksLimit: 15,
+                                            font: {
+                                                size: 11
+                                            }
+                                        }
+                                    },
+                                    y: {
+                                        grid: {
+                                            color: 'rgba(255, 255, 255, 0.08)',
+                                            drawBorder: false
+                                        },
+                                        ticks: {
+                                            color: '#A8B0C8',
+                                            callback: function(value) {
+                                                return '$' + value.toFixed(0);
+                                            },
+                                            font: {
+                                                size: 12,
+                                                family: 'JetBrains Mono'
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+                })
+                .catch(error => console.error('Chart update error:', error));
+        }
+
+        // Trades pagination
+        let currentPage = 1;
+        const tradesPerPage = 10;
+        let allTrades = [];
+
+        function updateTrades() {
+            fetch('/api/trades')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        allTrades = result.data.reverse();
+                        renderTradesPage(currentPage);
+                    }
+                })
+                .catch(error => console.error('Trades update error:', error));
+        }
+
+        function renderTradesPage(page) {
+            const tbody = document.getElementById('trades-tbody');
+
+            if (allTrades.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="loading">暂无交易记录...</td></tr>';
+                document.getElementById('page-info').textContent = '第 0 页';
+                return;
+            }
+
+            const totalPages = Math.ceil(allTrades.length / tradesPerPage);
+            currentPage = Math.max(1, Math.min(page, totalPages));
+
+            const startIndex = (currentPage - 1) * tradesPerPage;
+            const endIndex = startIndex + tradesPerPage;
+            const pageTrades = allTrades.slice(startIndex, endIndex);
+
+            tbody.innerHTML = pageTrades.map(trade => {
+                const isLong = trade.action.includes('LONG');
+                const actionClass = isLong ? 'badge-long' : 'badge-short';
+
+                let pnlHtml = '<td style="color: var(--text-secondary);">-</td>';
+                if (trade.pnl !== undefined && trade.pnl !== null) {
+                    const pnl = parseFloat(trade.pnl);
+                    const pnlColor = pnl >= 0 ? 'var(--success-light)' : 'var(--danger-light)';
+                    const pnlSign = pnl >= 0 ? '+' : '';
+                    pnlHtml = `<td style="color: ${pnlColor}; font-weight: 700; font-family: 'JetBrains Mono', monospace;">${pnlSign}$${pnl.toFixed(2)}</td>`;
+                }
+
+                return `
+                    <tr>
+                        <td>${new Date(trade.time).toLocaleString('zh-CN', {
+                            month: '2-digit',
+                            day: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        })}</td>
+                        <td><strong>${trade.symbol}</strong></td>
+                        <td><span class="badge ${actionClass}">${trade.action}</span></td>
+                        <td>${trade.quantity ? trade.quantity.toFixed(4) : '-'}</td>
+                        <td>$${trade.price ? trade.price.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}</td>
+                        <td>${trade.leverage}x</td>
+                        <td>${trade.confidence || '-'}%</td>
+                        ${pnlHtml}
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('page-info').textContent = `第 ${currentPage} / ${totalPages} 页`;
+
+            const prevBtn = document.getElementById('prev-page');
+            const nextBtn = document.getElementById('next-page');
+            prevBtn.disabled = currentPage === 1;
+            nextBtn.disabled = currentPage === totalPages;
+        }
+
+        document.getElementById('prev-page').addEventListener('click', () => {
+            if (currentPage > 1) {
+                renderTradesPage(currentPage - 1);
+            }
+        });
+
+        document.getElementById('next-page').addEventListener('click', () => {
+            const totalPages = Math.ceil(allTrades.length / tradesPerPage);
+            if (currentPage < totalPages) {
+                renderTradesPage(currentPage + 1);
+            }
+        });
+
+        // Update AI decisions
+        function updateDecisions() {
+            fetch('/api/decisions')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        AppState.updateDecisions(result.data);
+                        const decisions = AppState.decisions;
+                        const container = document.getElementById('decisions-container');
+
+                        if (decisions.length === 0) {
+                            container.innerHTML = '<div class="loading">最近30分钟无AI决策...</div>';
+                            return;
+                        }
+
+                        container.innerHTML = decisions.map(decision => {
+                            let actionClass = 'hold';
+                            let actionText = decision.action;
+
+                            // 动作名称直接使用英文 (中文映射已禁用)
+                            // const actionMap = {
+                            //     'HOLD': '持有',
+                            //     'BUY': '买入',
+                            //     'SELL': '卖出',
+                            //     'OPEN_LONG': '开多',
+                            //     'OPEN_SHORT': '开空',
+                            //     'CLOSE': '平仓',
+                            //     'CLOSE_LONG': '平多',
+                            //     'CLOSE_SHORT': '平空'
+                            // };
+
+                            actionText = decision.action;
+
+                            if (decision.action.includes('BUY') || decision.action.includes('LONG')) {
+                                actionClass = 'buy';
+                            } else if (decision.action.includes('SELL') || decision.action.includes('SHORT')) {
+                                actionClass = 'sell';
+                            } else if (decision.action.includes('CLOSE')) {
+                                actionClass = 'close';
+                            }
+
+                            const isReasonerModel = decision.model_used === 'deepseek-reasoner' ||
+                                                    decision.reasoning_content;
+
+                            const cardStyle = isReasonerModel
+                                ? 'background: linear-gradient(135deg, rgba(139, 127, 216, 0.18), rgba(139, 127, 216, 0.06)); border: 1.5px solid rgba(139, 127, 216, 0.45); box-shadow: 0 8px 24px rgba(139, 127, 216, 0.25);'
+                                : 'background: linear-gradient(135deg, rgba(45, 212, 191, 0.15), rgba(45, 212, 191, 0.05)); border: 1.5px solid rgba(45, 212, 191, 0.35); box-shadow: 0 8px 24px rgba(45, 212, 191, 0.2);';
+
+                            const modelBadge = isReasonerModel
+                                ? '<span style="background: linear-gradient(135deg, #8B7FD8, #A78BFA); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(139, 127, 216, 0.5);">REASONER</span>'
+                                : '<span style="background: linear-gradient(135deg, #2DD4BF, #5EEAD4); color: white; padding: 5px 12px; border-radius: 6px; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.05em; box-shadow: 0 4px 12px rgba(45, 212, 191, 0.5);">CHAT</span>';
+
+                            const reasoningSection = decision.reasoning_content && isReasonerModel
+                                ? `<div style="margin-top: 15px; padding: 14px; background: linear-gradient(135deg, rgba(139, 127, 216, 0.2), rgba(139, 127, 216, 0.1)); border-left: 3px solid #8B7FD8; border-radius: 8px; font-size: 0.85rem; color: #D0D0E0; line-height: 1.6;">
+                                    <div style="font-weight: 700; color: #A78BFA; margin-bottom: 8px; font-size: 0.9rem;">
+                                        深度推理过程
+                                    </div>
+                                    <div style="font-size: 0.8rem; line-height: 1.7;">
+                                        ${decision.reasoning_content}
+                                    </div>
+                                </div>`
+                                : '';
+
+                            // 完整时间格式（精确到秒）
+                            const timeMatch = decision.time.match(/(\d{2}):(\d{2}):(\d{2})/);
+                            const detailedTime = timeMatch ? `${timeMatch[1]}:${timeMatch[2]}:${timeMatch[3]}` : decision.time;
+
+                            return `
+                                <div class="decision-card collapsed" data-model="${isReasonerModel ? 'reasoner' : 'chat'}" style="${cardStyle}" onclick="toggleDecisionCard(this)">
+                                    <div class="decision-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                        <div style="display: flex; align-items: center;">
+                                            <span class="decision-main-action ${actionClass}" style="text-shadow: 0 2px 8px rgba(0,0,0,0.3);">${actionText}</span>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            ${modelBadge}
+                                            <span style="background: rgba(0,0,0,0.3); color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'}; padding: 4px 10px; border-radius: 6px; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.05em; border: 1px solid ${isReasonerModel ? 'rgba(139, 127, 216, 0.4)' : 'rgba(45, 212, 191, 0.4)'};">${decision.symbol}</span>
+                                            <span class="decision-time" style="font-size: 0.7rem; color: rgba(255,255,255,0.5); font-family: 'JetBrains Mono', monospace; font-weight: 600;">${detailedTime}</span>
+                                        </div>
+                                    </div>
+                                    <div class="decision-summary">
+                                        ${decision.reasoning}
+                                    </div>
+                                    <div class="decision-expand-hint">点击展开</div>
+                                    <div class="decision-details">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin: 12px 0 8px 0; padding: 8px; background: rgba(0,0,0,0.2); border-radius: 6px;">
+                                            <span style="font-size: 0.95rem; font-weight: 700; color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'};">${decision.symbol}</span>
+                                            <span class="decision-confidence" style="font-size: 0.85rem; font-weight: 700; color: ${isReasonerModel ? '#A78BFA' : '#2DD4BF'};">信心度 ${decision.confidence}%</span>
+                                        </div>
+                                        <div class="decision-reasoning">
+                                            <div style="font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 6px;">完整理由</div>
+                                            <div style="color: rgba(255,255,255,0.9);">${decision.reasoning}</div>
+                                        </div>
+                                        ${reasoningSection}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                })
+                .catch(error => console.error('Decisions update error:', error));
+        }
+
+        // Update positions
+        function updatePositions() {
+            fetch('/api/positions')
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        const positions = result.data;
+                        const grid = document.getElementById('positions-grid');
+
+                        if (positions.length === 0) {
+                            grid.innerHTML = '<div class="no-positions">暂无持仓 🌙</div>';
+                            return;
+                        }
+
+                        grid.innerHTML = positions.map(pos => {
+                            const pnlClass = pos.pnl_pct >= 0 ? 'positive' : 'negative';
+                            const pnlSign = pos.pnl_pct >= 0 ? '+' : '';
+                            const sideClass = pos.side === 'LONG' ? 'long' : 'short';
+
+                            return `
+                                <div class="position-card">
+                                    <div class="position-header">
+                                        <span class="position-symbol">${pos.symbol}</span>
+                                        <span class="position-side ${sideClass}">${pos.side_cn}</span>
+                                    </div>
+                                    <div class="position-info">
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">数量</span>
+                                            <span class="position-info-value">${pos.quantity}</span>
+                                        </div>
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">杠杆</span>
+                                            <span class="position-info-value">${pos.leverage}x</span>
+                                        </div>
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">开仓价</span>
+                                            <span class="position-info-value">$${pos.entry_price.toFixed(2)}</span>
+                                        </div>
+                                        <div class="position-info-item">
+                                            <span class="position-info-label">当前价</span>
+                                            <span class="position-info-value">$${pos.current_price.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                    <div class="position-pnl ${pnlClass}">
+                                        <div class="position-pnl-value">
+                                            ${pnlSign}$${Math.abs(pos.pnl_usd).toFixed(2)}
+                                        </div>
+                                        <div class="position-pnl-pct">
+                                            ${pnlSign}${pos.pnl_pct.toFixed(2)}%
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    }
+                })
+                .catch(error => console.error('Positions update error:', error));
+        }
+
+        // ==================== WebSocket 实时连接 ====================
+
+        socket = io();
+
+        socket.on('connect', function() {
+            console.log('%c⚡ WebSocket 已连接', 'font-size: 14px; font-weight: bold; color: #2DD4BF;');
+            console.log('%c⚡ 延迟 <100ms 实时推送已启用', 'font-size: 12px; color: #2DD4BF;');
+        });
+
+        socket.on('disconnect', function() {
+            console.log('%c❌ WebSocket 已断开，尝试重连...', 'font-size: 12px; color: #EF4444;');
+        });
+
+        socket.on('performance_update', function(result) {
+            if (result.success) {
+                const data = result.data;
+                const prevPnl = previousValues['unrealized-pnl'] || 0;
+
+                animateNumber(document.getElementById('account-value'), data.account_value, {
+                    prefix: '$',
+                    useLocale: true,
+                    decimals: 2
+                });
+
+                const returnElem = document.getElementById('total-return');
+                const returnValue = data.total_return_pct;
+                animateNumber(returnElem, returnValue, {
+                    suffix: '%',
+                    decimals: 2,
+                    isPercentage: true,
+                    className: 'value ' + (returnValue >= 0 ? 'positive' : 'negative')
+                });
+
+                const sharpeElem = document.getElementById('sharpe-ratio');
+                animateNumber(sharpeElem, data.sharpe_ratio, {
+                    decimals: 2,
+                    className: 'value ' + (data.sharpe_ratio >= 1 ? 'positive' : '')
+                });
+
+                animateNumber(document.getElementById('max-drawdown'), data.max_drawdown_pct, {
+                    suffix: '%',
+                    decimals: 2
+                });
+
+                const winRateElem = document.getElementById('win-rate');
+                animateNumber(winRateElem, data.win_rate_pct, {
+                    suffix: '%',
+                    decimals: 2,
+                    className: 'value ' + (data.win_rate_pct >= 50 ? 'positive' : '')
+                });
+
+                animateNumber(document.getElementById('total-trades'), data.total_trades, {
+                    decimals: 0
+                });
+
+                animateNumber(document.getElementById('open-positions'), data.open_positions, {
+                    decimals: 0
+                });
+
+                const pnlElem = document.getElementById('unrealized-pnl');
+                animateNumber(pnlElem, data.unrealized_pnl, {
+                    prefix: '$',
+                    decimals: 2,
+                    isPercentage: true,
+                    className: 'value ' + (data.unrealized_pnl >= 0 ? 'positive' : 'negative')
+                });
+
+                if (Math.abs(data.unrealized_pnl - prevPnl) > 5) {
+                    if (data.unrealized_pnl > prevPnl) {
+                        playProfitSound();
+                    } else if (data.unrealized_pnl < prevPnl) {
+                        playLossSound();
+                    }
+                }
+
+                document.getElementById('last-update').textContent = new Date().toLocaleString('zh-CN', {
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+            }
+        });
+
+        socket.on('positions_update', function(result) {
+            if (result.success) {
+                const positions = result.data;
+                const grid = document.getElementById('positions-grid');
+
+                if (positions.length === 0) {
+                    grid.innerHTML = '<div class="no-positions">暂无持仓 🌙</div>';
+                    return;
+                }
+
+                grid.innerHTML = positions.map(pos => {
+                    const pnlClass = pos.pnl_pct >= 0 ? 'positive' : 'negative';
+                    const pnlSign = pos.pnl_pct >= 0 ? '+' : '';
+                    const sideClass = pos.side === 'LONG' ? 'long' : 'short';
+
+                    const prevPrice = previousPrices[pos.symbol] || pos.current_price;
+                    let priceArrow = '';
+
+                    if (pos.current_price > prevPrice) {
+                        priceArrow = ' <span style="color: var(--success-light); font-size: 0.9rem;">▲</span>';
+                    } else if (pos.current_price < prevPrice) {
+                        priceArrow = ' <span style="color: var(--danger-light); font-size: 0.9rem;">▼</span>';
+                    }
+
+                    previousPrices[pos.symbol] = pos.current_price;
+
+                    return `
+                        <div class="position-card">
+                            <div class="position-header">
+                                <span class="position-symbol">${pos.symbol}</span>
+                                <span class="position-side ${sideClass}">${pos.side_cn}</span>
+                            </div>
+                            <div class="position-info">
+                                <div class="position-info-item">
+                                    <span class="position-info-label">数量</span>
+                                    <span class="position-info-value">${pos.quantity}</span>
+                                </div>
+                                <div class="position-info-item">
+                                    <span class="position-info-label">杠杆</span>
+                                    <span class="position-info-value">${pos.leverage}x</span>
+                                </div>
+                                <div class="position-info-item">
+                                    <span class="position-info-label">开仓价</span>
+                                    <span class="position-info-value">$${pos.entry_price.toFixed(2)}</span>
+                                </div>
+                                <div class="position-info-item">
+                                    <span class="position-info-label">当前价</span>
+                                    <span class="position-info-value">$${pos.current_price.toFixed(2)}${priceArrow}</span>
+                                </div>
+                            </div>
+                            <div class="position-pnl ${pnlClass}">
+                                <div class="position-pnl-value">
+                                    ${pnlSign}$${Math.abs(pos.pnl_usd).toFixed(2)}
+                                </div>
+                                <div class="position-pnl-pct">
+                                    ${pnlSign}${pos.pnl_pct.toFixed(2)}%
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
+        });
+
+        // Initial load
+        updateChart();
+        updateTrades();
+        updateDecisions();
+
+        setInterval(() => {
+            updateChart();
+        }, 10000);
+
+        setInterval(() => {
+            updateTrades();
+        }, 5000);
+
+        setInterval(() => {
+            updateDecisions();
+        }, 2 * 60 * 1000);
+
+        // ==================== Binance REST API 实时价格（已禁用，改用WebSocket）====================
+
+        const priceSymbols = ['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT', 'ADAUSDT'];
+        const previousPricesWS = {};
+        const ENABLE_REST_PRICE_POLLING = false; // 关闭REST价格轮询，避免触发限频
+
+        // 使用REST API获取实时价格（每2秒更新一次）
+        function fetchBinancePrices() {
+            // 批量获取所有交易对的24小时ticker
+            const symbolsQuery = priceSymbols.map(s => `"${s}"`).join(',');
+
+            fetch(`https://api.binance.com/api/v3/ticker/24hr?symbols=[${symbolsQuery}]`)
+                .then(response => response.json())
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        data.forEach(ticker => {
+                            const symbol = ticker.symbol;
+                            const price = parseFloat(ticker.lastPrice);
+                            const priceChange = parseFloat(ticker.priceChangePercent);
+
+                            updateTickerPrice(symbol, price, priceChange);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('%c❌ 价格获取失败:', 'color: #EF4444;', error);
+                    // 失败后继续重试
+                });
+        }
+
+        // 初始加载（已关闭REST轮询）
+        if (ENABLE_REST_PRICE_POLLING) {
+            console.log('%c💰 启动实时价格更新...', 'color: #2DD4BF; font-weight: bold;');
+            fetchBinancePrices();
+            // 每2秒更新一次价格
+            setInterval(fetchBinancePrices, 2000);
+        } else {
+            console.log('%c💰 已禁用REST价格轮询，改用WebSocket推送', 'color: #2DD4BF; font-weight: bold;');
+        }
+
+        function updateTickerPrice(symbol, price, priceChange) {
+            const priceElem = document.getElementById(`price-${symbol}`);
+            const changeElem = document.getElementById(`change-${symbol}`);
+            const arrowElem = document.getElementById(`arrow-${symbol}`);
+            const tickerItem = document.querySelector(`.ticker-item[data-symbol="${symbol}"]`);
+
+            if (!priceElem || !changeElem || !arrowElem) return;
+
+            // 格式化价格（根据价格大小决定小数位）
+            let formattedPrice;
+            if (price >= 1000) {
+                formattedPrice = '$' + price.toFixed(2);
+            } else if (price >= 1) {
+                formattedPrice = '$' + price.toFixed(3);
+            } else {
+                formattedPrice = '$' + price.toFixed(4);
+            }
+
+            // 更新价格
+            priceElem.textContent = formattedPrice;
+
+            // 更新涨跌幅
+            const changeSign = priceChange >= 0 ? '+' : '';
+            changeElem.textContent = changeSign + priceChange.toFixed(2) + '%';
+            changeElem.className = 'ticker-change ' + (priceChange >= 0 ? 'positive' : 'negative');
+
+            // 价格变化动画和箭头
+            if (previousPricesWS[symbol] !== undefined) {
+                const prevPrice = previousPricesWS[symbol];
+
+                if (price > prevPrice) {
+                    // 价格上涨
+                    arrowElem.textContent = '▲';
+                    arrowElem.style.color = 'var(--success-light)';
+                    tickerItem.classList.remove('price-down');
+                    tickerItem.classList.add('price-up');
+
+                    setTimeout(() => {
+                        tickerItem.classList.remove('price-up');
+                    }, 500);
+                } else if (price < prevPrice) {
+                    // 价格下跌
+                    arrowElem.textContent = '▼';
+                    arrowElem.style.color = 'var(--danger-light)';
+                    tickerItem.classList.remove('price-up');
+                    tickerItem.classList.add('price-down');
+
+                    setTimeout(() => {
+                        tickerItem.classList.remove('price-down');
+                    }, 500);
+                }
+            }
+
+            previousPricesWS[symbol] = price;
+        }
+
+        // 启动Binance WebSocket连接
+        connectBinanceWebSocket();
+
+        console.log('%c⚡ ALPHA ARENA DASHBOARD', 'font-size: 20px; font-weight: bold; color: #2DD4BF;');
+        console.log('%cDeepSeek-V3 UltraThink AI Trading System', 'font-size: 14px; color: #8B7FD8;');
+        console.log('%cWebSocket 实时推送已启用 (延迟 <100ms)', 'font-size: 12px; color: #10B981;');
+
+        // ========== 交易历史过滤功能 ==========
+        let allTradesData = [];
+
+        // 应用过滤器
+        function applyTradeFilters() {
+            const searchTerm = document.getElementById('trade-search')?.value.toLowerCase() || '';
+            const typeFilter = document.getElementById('trade-type-filter')?.value || 'all';
+            const pnlFilter = document.getElementById('trade-pnl-filter')?.value || 'all';
+
+            const tableRows = document.querySelectorAll('.trades-container tbody tr');
+
+            tableRows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 4) return;
+
+                const symbol = cells[1]?.textContent.toLowerCase() || '';
+                const type = cells[2]?.textContent || '';
+                const pnlText = cells[5]?.textContent || '';
+
+                // Symbol搜索过滤
+                const symbolMatch = symbol.includes(searchTerm);
+
+                // 类型过滤
+                const typeMatch = typeFilter === 'all' || type.includes(typeFilter);
+
+                // 盈亏过滤
+                let pnlMatch = true;
+                if (pnlFilter === 'profit') {
+                    pnlMatch = pnlText.includes('+') || parseFloat(pnlText) > 0;
+                } else if (pnlFilter === 'loss') {
+                    pnlMatch = pnlText.includes('-') && !pnlText.includes('+');
+                }
+
+                // 显示或隐藏行
+                if (symbolMatch && typeMatch && pnlMatch) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+
+        // 绑定过滤器事件
+        document.addEventListener('DOMContentLoaded', () => {
+            setTimeout(() => {
+                const searchBox = document.getElementById('trade-search');
+                const typeFilter = document.getElementById('trade-type-filter');
+                const pnlFilter = document.getElementById('trade-pnl-filter');
+                const resetButton = document.getElementById('reset-filters');
+
+                if (searchBox) searchBox.addEventListener('input', applyTradeFilters);
+                if (typeFilter) typeFilter.addEventListener('change', applyTradeFilters);
+                if (pnlFilter) pnlFilter.addEventListener('change', applyTradeFilters);
+                if (resetButton) {
+                    resetButton.addEventListener('click', () => {
+                        if (searchBox) searchBox.value = '';
+                        if (typeFilter) typeFilter.value = 'all';
+                        if (pnlFilter) pnlFilter.value = 'all';
+                        applyTradeFilters();
+                    });
+                }
+            }, 500);
+        });
+
+
+        // ========== 图表导出和缩放功能 ==========
+        function exportChartAsImage() {
+            const canvas = document.getElementById('equity-chart');
+            if (canvas) {
+                const link = document.createElement('a');
+                link.download = `alpha-arena-chart-${new Date().toISOString().split('T')[0]}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
+        }
+
+        function resetChartZoom() {
+            if (window.equityChart) {
+                window.equityChart.resetZoom();
+            }
+        }
+
+    </script>
+
+    <!-- PWA Service Worker Registration -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/static/sw.js')
+                    .then(registration => {
+                        console.log('%c✅ Service Worker 已注册', 'color: #10B981;', registration);
+                        console.log('%c📱 可在移动设备上"添加到主屏幕"安装应用', 'color: #2DD4BF;');
+                    })
+                    .catch(error => {
+                        console.log('%c❌ Service Worker 注册失败:', 'color: #EF4444;', error);
+                    });
+            });
+        }
+    </script>
+
+    <!-- 底部系统状态栏 -->
+    <div id="status-bar" class="status-bar">
+        <div class="status-item">
+            <span class="status-icon">🕐</span>
+            <span class="status-label">运行时长</span>
+            <span class="status-value" id="runtime-display">加载中...</span>
+        </div>
+        <div class="status-item">
+            <span class="status-icon">🤖</span>
+            <span class="status-label">AI调用</span>
+            <span class="status-value" id="ai-calls">--</span>
+        </div>
+        <div class="status-item">
+            <span class="status-icon">🔄</span>
+            <span class="status-label">交易循环</span>
+            <span class="status-value" id="trading-loops">--</span>
+        </div>
+        <div class="status-item">
+            <span class="status-icon">⚡</span>
+            <span class="status-label">实时更新</span>
+            <span class="status-value status-live">LIVE</span>
+        </div>
+    </div>
+
+    <!-- 系统状态更新脚本 -->
+    <script>
+        // 系统状态实时更新
+        async function updateSystemStatus() {
+            try {
+                const response = await fetch('/api/system_status');
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    const data = result.data;
+
+                    // 更新运行时长
+                    document.getElementById('runtime-display').textContent = data.runtime_display || `${data.runtime_minutes}分钟`;
+
+                    // 更新AI调用次数
+                    document.getElementById('ai-calls').textContent = `${data.ai_calls || 0}次`;
+
+                    // 更新交易循环次数
+                    document.getElementById('trading-loops').textContent = `${data.trading_loops || 0}轮`;
+                } else if (!result.success) {
+                    // 如果获取失败，显示默认值
+                    console.warn('系统状态获取失败:', result.error);
+                }
+            } catch (error) {
+                console.error('系统状态更新错误:', error);
+            }
+        }
+
+        // 初始加载
+        updateSystemStatus();
+
+        // 每1秒更新一次系统状态
+        setInterval(updateSystemStatus, 1000);
+
+        console.log('%c🎯 底部状态栏已启用', 'color: #2DD4BF; font-weight: bold; font-size: 14px;');
+
+        // 清算价预警实时更新
+        async function updateLiquidationWarnings() {
+            try {
+                const response = await fetch('/api/liquidation_warnings');
+                const result = await response.json();
+
+                if (result.success && result.data) {
+                    const { warnings, count, has_critical } = result.data;
+                    const warningsContainer = document.getElementById('liquidation-warnings');
+                    const warningsList = document.getElementById('warnings-list');
+
+                    if (count > 0) {
+                        // 有预警：显示区域并更新内容
+                        warningsContainer.style.display = 'block';
+
+                        // 根据是否有危急预警添加/移除class
+                        if (has_critical) {
+                            warningsContainer.classList.add('has-critical');
+                        } else {
+                            warningsContainer.classList.remove('has-critical');
+                        }
+
+                        // 生成预警列表HTML
+                        warningsList.innerHTML = warnings.map(warning => `
+                            <div class="warning-item ${warning.risk_level.toLowerCase()}">
+                                <div class="warning-message">${warning.message}</div>
+                                <div class="warning-details">
+                                    当前价: $${warning.current_price.toFixed(2)} |
+                                    清算价: $${warning.liquidation_price.toFixed(2)} |
+                                    距离: ${warning.distance_pct.toFixed(2)}%
+                                </div>
+                            </div>
+                        `).join('');
+                    } else {
+                        // 无预警：隐藏区域
+                        warningsContainer.style.display = 'none';
+                    }
+                } else if (!result.success) {
+                    console.warn('清算预警获取失败:', result.error);
+                }
+            } catch (error) {
+                console.error('清算预警更新错误:', error);
+            }
+        }
+
+        // 初始加载清算预警
+        updateLiquidationWarnings();
+
+        // 每5秒更新一次清算预警（不需要太频繁）
+        setInterval(updateLiquidationWarnings, 5000);
+
+        console.log('%c⚠️  清算预警监控已启用', 'color: #ff6b6b; font-weight: bold; font-size: 14px;');
+    </script>
+</body>
+</html>

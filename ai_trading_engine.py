@@ -436,8 +436,8 @@ class AITradingEngine:
 
         leverage = int(leverage)
 
-        # 🔒 杠杆上限 - 最大20倍（与DeepSeek提示词保持一致）
-        MAX_LEVERAGE = 20
+        # 🔒 杠杆上限 - 最大30倍（与系统与DeepSeek提示一致）
+        MAX_LEVERAGE = 30
         if leverage > MAX_LEVERAGE:
             self.logger.warning(f"[WARNING] AI建议杠杆{leverage}x超过上限{MAX_LEVERAGE}x，已强制降至{MAX_LEVERAGE}x")
             leverage = MAX_LEVERAGE
@@ -565,7 +565,7 @@ class AITradingEngine:
             # 计算所需杠杆
             required_leverage = int(min_notional / amount) + 1
             original_leverage = leverage
-            leverage = min(max(leverage, required_leverage), 25)  # 最大25倍
+            leverage = min(max(leverage, required_leverage), 30)  # 最大30倍
 
             if leverage != original_leverage:
                 self.logger.info(f"[IDEA] [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "
@@ -683,7 +683,7 @@ class AITradingEngine:
             # 计算所需杠杆
             required_leverage = int(min_notional / amount) + 1
             original_leverage = leverage
-            leverage = min(max(leverage, required_leverage), 25)  # 最大25倍
+            leverage = min(max(leverage, required_leverage), 30)  # 最大30倍
 
             if leverage != original_leverage:
                 self.logger.info(f"[IDEA] [{symbol}] 智能杠杆调整: {original_leverage}x → {leverage}x "

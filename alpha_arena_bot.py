@@ -104,6 +104,13 @@ class AlphaArenaBot:
         symbols_str = os.getenv('TRADING_SYMBOLS', 'BTCUSDT,ETHUSDT')
         self.trading_symbols = [s.strip() for s in symbols_str.split(',')]
 
+        # 自动滚仓总开关（与AI ROLL避免冲突，默认关闭）
+        self.enable_auto_rolling = os.getenv('ENABLE_AUTO_ROLLING', 'false').lower() == 'true'
+        if self.enable_auto_rolling:
+            self.logger.info("[CONFIG] 自动滚仓 ENABLE_AUTO_ROLLING = true")
+        else:
+            self.logger.info("[CONFIG] 自动滚仓已关闭（ENABLE_AUTO_ROLLING = false）")
+
         self.logger.info(f"配置加载完成: {len(self.trading_symbols)} 个交易对")
 
     def _init_components(self):
@@ -369,8 +376,17 @@ class AlphaArenaBot:
                     break
 
             if existing_position:
-                # [NEW V3.0] 首先检查是否应该滚仓 (浮盈加仓)
-                self._check_and_execute_rolling(symbol, existing_position)
+                # [NEW V3.0] 可选：先检查是否应该滚仓 (浮盈加仓)
+                if self.enable_auto_rolling:
+                    self._check_and_execute_rolling(symbol, existing_position)
+
+                    # 自动滚仓可能已改变仓位，刷新后再交由AI评估，避免基于旧数据做二次滚仓
+                    positions = self.binance.get_active_positions()
+                    existing_position = None
+                    for pos in positions:
+                        if pos['symbol'] == symbol and float(pos.get('positionAmt', 0)) != 0:
+                            existing_position = pos
+                            break
 
                 # [OK] 新功能: 让AI评估是否应该平仓
                 self.logger.info(f"  [SEARCH] {symbol} 已有持仓，让AI评估是否平仓...")
@@ -450,6 +466,148 @@ class AlphaArenaBot:
                             self.logger.info(f"  [SUCCESS] 滚仓策略执行成功")
                         else:
                             self.logger.warning(f"  [WARNING] 滚仓策略执行失败: {roll_result.get('reason', '未知原因')}")
+
+                    elif action == 'PYRAMID':
+                        # 金字塔加仓（递减加仓）
+                        side = 'BUY' if float(existing_position.get('positionAmt', 0)) > 0 else 'SELL'
+                        base_size = float(ai_decision.get('base_size_usdt', 50))
+                        current_level = int(ai_decision.get('current_pyramid_level', 0))
+                        max_levels = int(ai_decision.get('max_pyramids', 3))
+                        reduction = float(ai_decision.get('reduction_factor', 0.5))
+
+                        self.logger.info(f"  📐 AI执行金字塔加仓 {symbol} → {side}")
+                        pyr_res = self.position_manager.pyramid_add_position(
+                            symbol=symbol,
+                            side=side,
+                            base_size_usdt=base_size,
+                            current_position_count=current_level,
+                            max_pyramids=max_levels,
+                            reduction_factor=reduction
+                        )
+                        if pyr_res.get('success'):
+                            self.logger.info("  ✅ 金字塔加仓成功")
+                        else:
+                            self.logger.warning(f"  ⚠️ 金字塔加仓失败: {pyr_res.get('error')}")
+
+                    elif action in ['MOVE_SL_BREAKEVEN', 'MOVE_TO_BREAKEVEN']:
+                        # 移动止损至盈亏平衡
+                        entry_price = float(existing_position.get('entryPrice', 0))
+                        profit_trigger_pct = float(ai_decision.get('profit_trigger_pct', ai_decision.get('profit_threshold_pct', 5.0)))
+                        offset_pct = float(ai_decision.get('breakeven_offset_pct', ai_decision.get('offset_pct', 0.2)))
+
+                        self.logger.info(f"  🛡️ AI移动止损至盈亏平衡 {symbol}")
+                        be_res = self.position_manager.move_stop_to_breakeven(
+                            symbol=symbol,
+                            entry_price=entry_price,
+                            profit_trigger_pct=profit_trigger_pct,
+                            breakeven_offset_pct=offset_pct
+                        )
+                        if be_res.get('success'):
+                            self.logger.info("  ✅ 移动止损成功")
+                        else:
+                            self.logger.warning(f"  ⚠️ 移动止损失败: {be_res.get('error')}")
+
+                    elif action in ['MULTI_TP', 'SCALE_OUT_TP']:
+                        # 分批止盈
+                        pos_amt = abs(float(existing_position.get('positionAmt', 0)))
+                        side = 'LONG' if float(existing_position.get('positionAmt', 0)) > 0 else 'SHORT'
+                        entry_price = float(existing_position.get('entryPrice', 0))
+                        targets = ai_decision.get('targets') or ai_decision.get('tp_levels') or [
+                            {"profit_pct": 6.0, "close_pct": 30},
+                            {"profit_pct": 10.0, "close_pct": 50},
+                            {"profit_pct": 15.0, "close_pct": 20},
+                        ]
+
+                        self.logger.info(f"  💰 AI设置分批止盈 {symbol}")
+                        tp_res = self.position_manager.setup_scale_out_take_profits(
+                            symbol=symbol,
+                            entry_price=entry_price,
+                            position_amt=pos_amt,
+                            side=side,
+                            targets=targets
+                        )
+                        if tp_res.get('success'):
+                            self.logger.info(f"  ✅ 分批止盈已设置: {tp_res.get('count', 0)} 个目标")
+                        else:
+                            self.logger.warning(f"  ⚠️ 分批止盈失败: {tp_res.get('error')}")
+
+                    elif action in ['TRAILING_STOP', 'SET_TRAILING_STOP']:
+                        # 追踪止损
+                        callback_rate = float(ai_decision.get('callback_rate_pct', ai_decision.get('callback_rate', 1.5)))
+                        activation_price = ai_decision.get('activation_price')
+                        pos_amt = abs(float(existing_position.get('positionAmt', 0)))
+                        side = 'LONG' if float(existing_position.get('positionAmt', 0)) > 0 else 'SHORT'
+
+                        self.logger.info(f"  🔄 AI设置追踪止损 {symbol}")
+                        ts_res = self.position_manager.setup_trailing_stop(
+                            symbol=symbol,
+                            position_amt=pos_amt,
+                            side=side,
+                            callback_rate_pct=callback_rate,
+                            activation_price=activation_price
+                        )
+                        if ts_res.get('success'):
+                            self.logger.info("  ✅ 追踪止损设置成功")
+                        else:
+                            self.logger.warning(f"  ⚠️ 追踪止损失败: {ts_res.get('error')}")
+
+                    elif action in ['ADJUST_LEVERAGE']:
+                        # 动态调整杠杆（基于波动率推荐）
+                        base_leverage = int(ai_decision.get('base_leverage', ai_decision.get('leverage', 5)))
+                        self.logger.info(f"  ⚖️ AI请求动态调整杠杆 {symbol}")
+                        adj_res = self.position_manager.adjust_leverage_by_volatility(
+                            symbol=symbol,
+                            base_leverage=base_leverage,
+                            min_leverage=2,
+                            max_leverage=30
+                        )
+                        if adj_res.get('success'):
+                            self.logger.info(f"  ✅ 杠杆已调整至 {adj_res.get('leverage')}x")
+                        else:
+                            self.logger.warning(f"  ⚠️ 杠杆调整失败: {adj_res.get('error')}")
+
+                    elif action in ['REBALANCE']:
+                        # 仓位再平衡
+                        target_usdt = float(ai_decision.get('target_size_usdt', 0))
+                        if target_usdt > 0:
+                            self.logger.info(f"  ⚖️ AI请求仓位再平衡 {symbol} → ${target_usdt:.2f}")
+                            rb_res = self.position_manager.rebalance_position_size(symbol, target_usdt)
+                            if rb_res.get('success'):
+                                self.logger.info("  ✅ 再平衡完成")
+                            else:
+                                self.logger.warning(f"  ⚠️ 再平衡失败: {rb_res.get('error')}")
+                        else:
+                            self.logger.warning("  ⚠️ REBALANCE 缺少 target_size_usdt，已跳过")
+
+                    elif action in ['HEDGE']:
+                        # 对冲
+                        ratio = float(ai_decision.get('hedge_ratio', 0.5))
+                        self.logger.info(f"  🔰 AI请求对冲 {symbol}，比例 {ratio*100:.0f}%")
+                        hg_res = self.position_manager.open_hedge_position(symbol, hedge_ratio=ratio)
+                        if hg_res.get('success'):
+                            self.logger.info("  ✅ 对冲下单成功")
+                        else:
+                            self.logger.warning(f"  ⚠️ 对冲失败: {hg_res.get('error')}")
+
+                    elif action in ['ATR_STOP']:
+                        # ATR自适应止损
+                        side = 'BUY' if float(existing_position.get('positionAmt', 0)) > 0 else 'SELL'
+                        entry_price = float(existing_position.get('entryPrice', 0))
+                        quantity = abs(float(existing_position.get('positionAmt', 0)))
+                        atr_mult = float(ai_decision.get('atr_multiplier', 2.0))
+
+                        self.logger.info(f"  📊 AI设置ATR自适应止损 {symbol}")
+                        atr_res = self.position_manager.set_atr_based_stop_loss(
+                            symbol=symbol,
+                            side=side,
+                            entry_price=entry_price,
+                            quantity=quantity,
+                            atr_multiplier=atr_mult
+                        )
+                        if atr_res.get('success'):
+                            self.logger.info("  ✅ ATR止损设置成功")
+                        else:
+                            self.logger.warning(f"  ⚠️ ATR止损失败: {atr_res.get('error')}")
 
                     else:
                         self.logger.info(f"  [OK] AI建议继续持有 {symbol} (信心度: {ai_decision.get('confidence', 0)}%)")
@@ -870,6 +1028,15 @@ class AlphaArenaBot:
 
                 # 执行加仓
                 try:
+                    # [SAFETY] 若AI ROLL计数已达上限，则不再自动滚仓，避免与AI策略冲突
+                    try:
+                        current_rolls = self.roll_tracker.get_roll_count(symbol)
+                        if current_rolls >= 6:
+                            self.logger.info(f"   ⛔ 已达AI ROLL上限(6/6)，跳过自动滚仓")
+                            return
+                    except Exception:
+                        pass
+
                     side = 'BUY' if pos_amt > 0 else 'SELL'
                     leverage = int(position.get('leverage', 30))
 
@@ -877,6 +1044,25 @@ class AlphaArenaBot:
 
                     # 确保杠杆设置正确
                     self.binance.set_leverage(symbol, leverage)
+
+                    # [RISK] 交易风控校验，避免超限
+                    try:
+                        account_balance = self.binance.get_futures_usdt_balance()
+                        open_positions = len([p for p in self.binance.get_active_positions() if float(p.get('positionAmt', 0)) != 0])
+                        price_for_check = mark_price if mark_price > 0 else entry_price
+                        is_ok, vr = self.risk_manager.validate_order(
+                            symbol=symbol,
+                            quantity=abs(roll_quantity),
+                            price=price_for_check,
+                            account_balance=account_balance,
+                            open_positions=open_positions,
+                            leverage=leverage
+                        )
+                        if not is_ok:
+                            self.logger.warning(f"   ⚠️ 风控拒绝自动滚仓: {vr}")
+                            return
+                    except Exception as e:
+                        self.logger.warning(f"   ⚠️ 风控校验失败（继续尝试下单）: {e}")
 
                     # 创建市价单加仓
                     order_result = self.binance.create_futures_order(

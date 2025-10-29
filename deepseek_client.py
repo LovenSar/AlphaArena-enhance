@@ -34,6 +34,17 @@ class DeepSeekClient:
         }
         self.logger = logging.getLogger(__name__)
 
+        # 超时与重试配置（可通过环境变量调整）
+        # Chat默认60秒、Reasoner默认120秒，最大重试默认2次
+        try:
+            self.chat_timeout_seconds = int(os.getenv('DEEPSEEK_CHAT_TIMEOUT_SECONDS', '120'))
+            self.reasoner_timeout_seconds = int(os.getenv('DEEPSEEK_REASONER_TIMEOUT_SECONDS', '180'))
+            self.max_retries_default = int(os.getenv('DEEPSEEK_MAX_RETRIES', '3'))
+        except Exception:
+            self.chat_timeout_seconds = 120
+            self.reasoner_timeout_seconds = 180
+            self.max_retries_default = 3
+
     def get_trading_session(self) -> Dict:
         """
         获取当前交易时段信息
@@ -109,7 +120,7 @@ class DeepSeekClient:
 
     def chat_completion(self, messages: List[Dict], model: str = None,
                        temperature: float = 0.7, max_tokens: int = 2000,
-                       timeout: int = None, max_retries: int = 2) -> Dict:
+                       timeout: int = None, max_retries: int = None) -> Dict:
         """
         调用 DeepSeek Chat 完成 API（带重试机制）
 
@@ -126,7 +137,12 @@ class DeepSeekClient:
         """
         # 根据模型类型自动设置超时时间
         if timeout is None:
-            timeout = 60   # Chat V3.1模型：1分钟
+            # 使用默认chat超时；如调用方显式传入则覆盖
+            timeout = self.chat_timeout_seconds
+
+        # 最大重试次数默认值
+        if max_retries is None:
+            max_retries = self.max_retries_default
 
         payload = {
             "model": (model or self.model_name),
@@ -134,6 +150,15 @@ class DeepSeekClient:
             "temperature": temperature,
             "max_tokens": max_tokens
         }
+
+        # 可选：强制模型仅输出 JSON 对象（需接口支持）。默认关闭，可通过环境变量开启。
+        # 开启方式：DEEPSEEK_FORCE_JSON=true
+        try:
+            if os.getenv('DEEPSEEK_FORCE_JSON', 'false').lower() == 'true':
+                payload["response_format"] = {"type": "json_object"}
+        except Exception:
+            # 环境变量异常时忽略，保持兼容
+            pass
 
         # 重试机制
         for attempt in range(max_retries + 1):
@@ -164,6 +189,29 @@ class DeepSeekClient:
                         self.logger.info(f"[MONEY] 缓存统计 - 命中率: {cache_rate:.1f}% | "
                                        f"命中: {cache_hit} tokens | 未命中: {cache_miss} tokens | "
                                        f"节省约: {savings:.0f} tokens成本")
+
+                # 校验返回是否包含有效 content；若为空则作为瞬时错误重试
+                try:
+                    choices = result.get('choices', [])
+                    content = ""
+                    if choices:
+                        message_obj = choices[0].get('message', {})
+                        content = str(message_obj.get('content', '')).strip()
+                    if not content:
+                        self.logger.warning("DeepSeek 返回空内容，准备重试...")
+                        if attempt < max_retries:
+                            continue
+                        else:
+                            # 已达最大重试次数，抛出错误供上层处理
+                            self.logger.error(f"DeepSeek 返回空内容（已重试{max_retries}次）: {str(result)[:300]}")
+                            raise ValueError("DeepSeek empty content")
+                except Exception as _e:
+                    # 结构异常也参与重试
+                    self.logger.warning(f"DeepSeek 响应结构异常，准备重试...: {_e}")
+                    if attempt < max_retries:
+                        continue
+                    else:
+                        raise
 
                 return result
 
@@ -205,7 +253,8 @@ class DeepSeekClient:
                 messages=messages,
                 model=self.reasoner_model,
                 temperature=0.1,  # 使用较低温度提高准确性
-                max_tokens=max_tokens
+                max_tokens=max_tokens,
+                timeout=self.reasoner_timeout_seconds
             )
         except Exception as e:
             self.logger.error(f"Chat V3.1模型调用失败: {e}")
@@ -1711,6 +1760,21 @@ ORDERING: OLDEST → NEWEST
         解析 AI 的决策响应
         支持多种格式：纯JSON、Markdown代码块、混合文本
         """
+        # 空响应提前处理，避免误导性 JSON 错误
+        if not ai_response or not str(ai_response).strip():
+            error_msg = 'AI 响应为空'
+            self.logger.error(f"[ERROR] {error_msg}")
+            return {
+                'action': 'HOLD',
+                'confidence': 0,
+                'narrative': error_msg,
+                'reasoning': error_msg,
+                'position_size': 0,
+                'leverage': 1,
+                'stop_loss_pct': 2,
+                'take_profit_pct': 4
+            }
+
         try:
             # 方法1: 尝试提取Markdown JSON代码块 ```json ... ```
             if "```json" in ai_response.lower():

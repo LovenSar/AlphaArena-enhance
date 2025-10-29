@@ -327,12 +327,36 @@ class PerformanceTracker:
             # 市价单手续费率：0.04% (Taker)
             fee_rate = 0.0004
 
-            for trade in trades:
-                if trade.get('action') in ['BUY', 'SELL', 'OPEN_LONG', 'OPEN_SHORT', 'CLOSE', 'CLOSE_LONG', 'CLOSE_SHORT']:
-                    price = trade.get('price', 0)
-                    quantity = trade.get('quantity', 0)
+            # 计入手续费的动作类型（包含加仓与平仓）
+            fee_actions = {
+                'BUY', 'SELL', 'OPEN_LONG', 'OPEN_SHORT', 'CLOSE', 'CLOSE_LONG', 'CLOSE_SHORT',
+                'ROLL_ADD_LONG', 'ROLL_ADD_SHORT'
+            }
 
-                    # 计算名义价值（不考虑杠杆，因为手续费基于名义价值）
+            for trade in trades:
+                action = trade.get('action')
+                if action in fee_actions:
+                    # price 优先取 price，其次 entry_price；统一为 float，None 视为0
+                    raw_price = trade.get('price')
+                    if raw_price in (None, ''):
+                        raw_price = trade.get('entry_price')
+                    try:
+                        price = float(raw_price) if raw_price not in (None, '') else 0.0
+                    except Exception:
+                        price = 0.0
+
+                    # quantity 统一为 float，None/'' 视为0
+                    raw_qty = trade.get('quantity')
+                    try:
+                        quantity = float(raw_qty) if raw_qty not in (None, '') else 0.0
+                    except Exception:
+                        quantity = 0.0
+
+                    if price <= 0 or quantity <= 0:
+                        # 避免脏数据导致异常；仅跳过该笔
+                        continue
+
+                    # 计算名义价值（手续费按名义价值计，不考虑杠杆）
                     notional = price * quantity
                     total_fees += notional * fee_rate
 

@@ -408,7 +408,7 @@ class BinanceClient:
 
     def create_futures_order(self, symbol: str, side: str, order_type: str,
                             quantity: float = None, price: float = None,
-                            position_side: str = 'BOTH',
+                            position_side: str = None,
                             reduce_only: bool = False,
                             time_in_force: str = 'GTC', **kwargs) -> Dict:
         """
@@ -424,11 +424,32 @@ class BinanceClient:
             reduce_only: 只减仓
             time_in_force: 有效期
         """
+        # 自动对齐账户持仓模式，避免 -4061 错误
+        # - 单向模式(dualSidePosition=False): 必须使用 positionSide=BOTH
+        # - 双向模式(dualSidePosition=True): 开多/开空需明确 LONG/SHORT
+        try:
+            mode = self.get_position_mode()
+            is_dual = bool(mode.get('dualSidePosition'))
+        except Exception:
+            # 获取失败则保守按单向处理
+            is_dual = False
+
+        if not is_dual:
+            # 单向模式统一使用 BOTH（忽略外部传入的不匹配值）
+            resolved_position_side = 'BOTH'
+        else:
+            # 双向模式：若未显式传入，则基于下单方向推断
+            if position_side in ['LONG', 'SHORT']:
+                resolved_position_side = position_side
+            else:
+                # 开仓单：BUY→LONG, SELL→SHORT；关闭单请显式传入 reduce_only+positionSide
+                resolved_position_side = 'LONG' if side == 'BUY' else 'SHORT'
+
         params = {
             'symbol': symbol,
             'side': side,
             'type': order_type,
-            'positionSide': position_side
+            'positionSide': resolved_position_side
         }
 
         if quantity:

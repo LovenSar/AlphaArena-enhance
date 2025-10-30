@@ -4,6 +4,7 @@ DeepSeek API 客户端
 """
 
 import requests
+import re
 import os
 import json
 from typing import Dict, List, Optional
@@ -51,7 +52,7 @@ class DeepSeekClient:
 
         Returns:
             Dict: {
-                'session': '欧美重叠盘/欧洲盘/美国盘/亚洲盘',
+                'session': '欧美重叠盘/欧洲盘/美国盘/常规时段',
                 'volatility': 'high/medium/low',
                 'recommendation': '建议/不建议开新仓',
                 'beijing_hour': 北京时间小时,
@@ -97,12 +98,12 @@ class DeepSeekClient:
                     'utc_hour': utc_hour,
                     'aggressive_mode': True
                 }
-            # 亚洲盘：UTC 22:00-8:00（北京06:00-16:00）- 波动小
+            # 常规时段（非欧美时段）：UTC 22:00-8:00（北京06:00-16:00）- 通常波动较小
             else:
                 return {
-                    'session': '亚洲盘',
+                    'session': '常规时段',
                     'volatility': 'low',
-                    'recommendation': '不建议开新仓（波动小）',
+                    'recommendation': '当前波动较小，谨慎开新仓',
                     'beijing_hour': beijing_hour,
                     'utc_hour': utc_hour,
                     'aggressive_mode': False
@@ -331,24 +332,6 @@ class DeepSeekClient:
 - **盈亏比思维**: 止损2%，止盈目标至少6%+（盈亏比3:1）
 
 💎 **第二铁律：让利润奔跑 - 盈利最大化！**
-[TIMER] **交易时段策略**（根据时段信息调整止盈目标）：
-- [HOT] 欧美重叠盘（波动最大）：
-  * **激进止盈目标：10-25%**（充分利用大波动，让利润奔跑）
-  * 杠杆可用15-25倍（波动大，收益空间大）
-  * 强趋势时持仓6-12小时，不要急着平仓
-  * 盈利10%时：锁定50%利润，剩余让它跑到20%+
-
-- [TREND-UP] 欧洲盘/美国盘（波动较大）：
-  * **中等止盈目标：8-18%**（抓住中等波动）
-  * 杠杆可用12-20倍
-  * 盈利8%时：可考虑部分止盈，剩余持有
-  * 强趋势不要急着全平，留一半仓位让利润奔跑
-
-- 💤 亚洲盘（波动小）：
-  * [WARNING] 建议不开新仓！波动小，机会成本高
-  * 如必须交易：止盈5-10%，杠杆降至8-12倍
-  * 持仓时间：观望为主，等待欧美盘接力
-
 [MONEY] **核心止盈策略 - 让利润奔跑！**：
 - **盈亏比至少3:1**: 止损2%，止盈目标至少6%起步
 - **强趋势让利润奔跑**:
@@ -1250,8 +1233,7 @@ class DeepSeekClient:
         Returns:
             AI决策 (action: CLOSE 或 HOLD)
         """
-        # 获取当前交易时段
-        session_info = self.get_trading_session()
+        # 已移除交易时段信息，专注技术面
 
         # 获取ROLL状态信息
         symbol = position_info.get('symbol', '')
@@ -1269,11 +1251,6 @@ class DeepSeekClient:
 ## [SEARCH] 持仓评估任务
 
 你需要评估当前持仓是否应该平仓。这是一个关键决策，可以保护利润或减少损失。
-
-### [TIMER] 当前交易时段
-- **时段**: {session_info['session']} (北京时间{session_info['beijing_hour']}:00)
-- **波动性**: {session_info['volatility'].upper()}
-- **时段建议**: {session_info['recommendation']}
 
 ### [ANALYZE] 持仓信息
 - **交易对**: {position_info['symbol']}
@@ -1561,15 +1538,8 @@ AI调用次数: {runtime_stats.get('total_invocations', 0)} 次
 ═══════════════════════════════════════════════════════════
 """
 
-        # 交易时段分析
+        # 市场数据（仅技术面）
         prompt += f"""
-[TIMER] 交易时段分析
-═══════════════════════════════════════════════════════════
-当前时段: {session_info['session']} (北京时间{session_info['beijing_hour']}:00)
-市场波动性: {session_info['volatility'].upper()}
-时段建议: {session_info['recommendation']}
-{'🔥 欧美盘波动大，适合激进交易，可设置更高止盈目标(8-15%)' if session_info['aggressive_mode'] else '📊 亚洲盘波动较小，已有盈利建议执行阶梯止盈锁定利润，新开仓可适度保守'}
-
 ═══════════════════════════════════════════════════════════
 [MARKET] 市场数据 ({market_data.get('symbol', 'N/A')})
 ═══════════════════════════════════════════════════════════
@@ -1751,7 +1721,24 @@ ORDERING: OLDEST → NEWEST
 已完成交易: {len(trade_history)}笔 (数据积累中，暂不显示胜率)
 """
 
-        prompt += "\n请分析并给出决策（JSON格式）。"
+        prompt += """
+
+[FORMAT] 返回一个且仅一个严格 JSON 对象（不得包含解释性文本/标题/列表）：
+{
+  "action": "OPEN_LONG" | "OPEN_SHORT" | "HOLD",
+  "confidence": 0-100,
+  "reasoning": "简要中文理由",
+  "position_size": 1-100,
+  "stop_loss_pct": 0.5-10,
+  "take_profit_pct": 1-20,
+  "leverage": 1-30
+}
+
+严格要求：
+- 不要使用省略号（... 或 …）、N/A、null、NaN、Infinity
+- 不要有尾逗号、注释、额外 Markdown 包裹
+- 所有数值字段必须是数字类型（不要用字符串表示数字）
+"""
 
         return prompt
 
@@ -1782,6 +1769,7 @@ ORDERING: OLDEST → NEWEST
                 json_end = ai_response.find("```", json_start)
                 if json_end > json_start:
                     json_str = ai_response[json_start:json_end].strip()
+                    json_str = self._cleanup_ai_json_string(json_str)
                     self.logger.info("[SEARCH] 从Markdown代码块中提取JSON")
                     decision = json.loads(json_str)
                     return self._validate_and_normalize_decision(decision)
@@ -1796,6 +1784,7 @@ ORDERING: OLDEST → NEWEST
                 json_end = ai_response.find("```", json_start)
                 if json_end > json_start:
                     json_str = ai_response[json_start:json_end].strip()
+                    json_str = self._cleanup_ai_json_string(json_str)
                     self.logger.info("[SEARCH] 从代码块中提取JSON")
                     decision = json.loads(json_str)
                     return self._validate_and_normalize_decision(decision)
@@ -1806,13 +1795,15 @@ ORDERING: OLDEST → NEWEST
                 end_idx = ai_response.rfind('}') + 1
                 if start_idx != -1 and end_idx > start_idx:
                     json_str = ai_response[start_idx:end_idx]
+                    json_str = self._cleanup_ai_json_string(json_str)
                     self.logger.info("[SEARCH] 从花括号中提取JSON")
                     decision = json.loads(json_str)
                     return self._validate_and_normalize_decision(decision)
 
             # 方法4: 直接解析整个响应
             self.logger.info("[SEARCH] 尝试直接解析整个响应为JSON")
-            decision = json.loads(ai_response)
+            cleaned = self._cleanup_ai_json_string(ai_response)
+            decision = json.loads(cleaned)
             return self._validate_and_normalize_decision(decision)
 
         except json.JSONDecodeError as e:
@@ -1843,6 +1834,89 @@ ORDERING: OLDEST → NEWEST
                 'take_profit_pct': 4
             }
 
+    def _cleanup_ai_json_string(self, json_str: str) -> str:
+        """将 AI 返回的近似 JSON 清洗为可被 json.loads 接受的严格 JSON。
+
+        修复项：
+        - 移除 Markdown 包裹符号与多余空白
+        - 替换省略号（.../…）为安全默认值
+        - 修正尾逗号
+        - 替换 NaN/Infinity 为 0
+        """
+        if not json_str:
+            return json_str
+
+        cleaned = json_str.strip()
+
+        # 去掉可能遗留的 Markdown 代码围栏
+        if cleaned.startswith("```") and cleaned.endswith("```"):
+            cleaned = cleaned.strip('`')
+
+        # 将 Windows/Mac 行结束统一化，避免奇怪的空白导致解析问题
+        cleaned = cleaned.replace('\r\n', '\n').replace('\r', '\n')
+
+        # 替换无效数值标记
+        invalid_numeric_patterns = {
+            'position_size': '5',
+            'leverage': '3',
+            'stop_loss_pct': '2',
+            'take_profit_pct': '4',
+            'confidence': '50',
+        }
+
+        for key, default_val in invalid_numeric_patterns.items():
+            # 1) key: ... 或 key: … 或 key: null/None/""
+            cleaned = re.sub(rf'("{key}"\s*:\s*)(\.{{3}}|…|null|None|"\s*"|\"\s*\")',
+                             rf'\g<1>{default_val}', cleaned)
+            # 2) key: NaN/Infinity/-Infinity
+            cleaned = re.sub(rf'("{key}"\s*:\s*)(NaN|Infinity|-Infinity)',
+                             rf'\g<1>{default_val}', cleaned)
+
+        # 全局兜底：任何裸露的 ... 或 …（不在字符串中）替换为 0
+        # 简单近似：先去掉被引号包裹的内容，再处理；这里采用温和替换，避免破坏文本字段
+        def _replace_ellipsis_outside_strings(text: str) -> str:
+            result = []
+            in_string = False
+            escape = False
+            i = 0
+            while i < len(text):
+                ch = text[i]
+                if ch == '"' and not escape:
+                    in_string = not in_string
+                    result.append(ch)
+                    i += 1
+                    continue
+                if ch == '\\' and not escape:
+                    escape = True
+                    result.append(ch)
+                    i += 1
+                    continue
+                if escape:
+                    escape = False
+                    result.append(ch)
+                    i += 1
+                    continue
+                # 仅当不在字符串中时处理 ... 与 …
+                if not in_string:
+                    if text.startswith('...', i):
+                        result.append('0')
+                        i += 3
+                        continue
+                    if text.startswith('…', i):
+                        result.append('0')
+                        i += 1
+                        continue
+                result.append(ch)
+                i += 1
+            return ''.join(result)
+
+        cleaned = _replace_ellipsis_outside_strings(cleaned)
+
+        # 修正尾逗号：在对象或数组的结束前去掉多余逗号
+        cleaned = re.sub(r',\s*([}\]])', r'\1', cleaned)
+
+        return cleaned
+
     def _validate_and_normalize_decision(self, decision: Dict) -> Dict:
         """验证并规范化AI决策"""
         # 验证必需字段（narrative和reasoning至少要有一个）
@@ -1861,11 +1935,22 @@ ORDERING: OLDEST → NEWEST
         elif 'reasoning' in decision and 'narrative' not in decision:
             decision['narrative'] = decision['reasoning']
 
-        # 设置默认值
-        decision.setdefault('position_size', 5)
-        decision.setdefault('leverage', 3)
-        decision.setdefault('stop_loss_pct', 2)
-        decision.setdefault('take_profit_pct', 4)
+        # 类型规范与默认值处理
+        def _to_number(val, default, is_int=False):
+            if val is None:
+                return int(default) if is_int else float(default)
+            try:
+                # 支持字符串数值，如 "12"、"12.5"
+                num = float(val)
+                return int(num) if is_int else float(num)
+            except Exception:
+                return int(default) if is_int else float(default)
+
+        decision['position_size'] = _to_number(decision.get('position_size', None), 5, is_int=False)
+        decision['leverage'] = _to_number(decision.get('leverage', None), 3, is_int=True)
+        decision['stop_loss_pct'] = _to_number(decision.get('stop_loss_pct', None), 2, is_int=False)
+        decision['take_profit_pct'] = _to_number(decision.get('take_profit_pct', None), 4, is_int=False)
+        decision['confidence'] = _to_number(decision.get('confidence', None), 0, is_int=True)
 
         # 限制范围（给DeepSeek更大的自主权）
         decision['position_size'] = max(1, min(100, decision['position_size']))
@@ -1913,6 +1998,11 @@ ORDERING: OLDEST → NEWEST
 - 纯文本解释
 - Markdown标题 (### ...)
 - 表格或列表
+
+[STRICT JSON RULES]
+- 仅输出一个 JSON 对象，不要输出任何额外文本
+- 不允许：省略号（.../…）、N/A、null、NaN、Infinity、尾逗号、注释
+- 数值字段必须为数字类型（不要用字符串）
 """
 
         messages = [

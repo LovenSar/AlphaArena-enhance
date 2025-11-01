@@ -177,6 +177,16 @@ class ProTradingFormatter(logging.Formatter):
 
         # 构建消息
         message = record.getMessage()
+        # 当消息以换行开头（会在前一行只输出前缀如 "DeepSeek •"），在该行后面补充当前AI URL
+        if self.compact:
+            try:
+                if isinstance(message, str) and message.startswith('\n'):
+                    # 延迟导入以避免循环依赖
+                    from deepseek_client import DeepSeekClient
+                    current_url = DeepSeekClient.get_current_endpoint_url()
+                    message = f" [AI_URL] {current_url}" + message
+            except Exception:
+                pass
 
         if self.compact:
             # 紧凑格式：HH:MM:SS.fff | MODULE | 消息

@@ -4,6 +4,8 @@ DeepSeek API 客户端
 """
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import re
 import os
 import json
@@ -11,6 +13,15 @@ from typing import Dict, List, Optional
 import logging
 from datetime import datetime
 import pytz
+from urllib.parse import urlparse as _urlparse
+
+# 可选：XTY(OpenAI风格)客户端支持
+try:
+    from openai import OpenAI  # type: ignore
+    import httpx  # type: ignore
+    _OPENAI_AVAILABLE = True
+except Exception:
+    _OPENAI_AVAILABLE = False
 
 
 class DeepSeekClient:
@@ -25,7 +36,7 @@ class DeepSeekClient:
         """
         self.api_key = api_key
         # 官方 DeepSeek 端点，允许通过环境变量覆盖
-        self.base_url = os.getenv('DEEPSEEK_API_BASE', 'https://api.deepseek.com/v1')
+        self.base_url = os.getenv('DEEPSEEK_API_BASE', 'https://svip.xty.app/v1')
         # 默认聊天与推理模型（可通过环境变量覆盖）
         self.model_name = os.getenv('DEEPSEEK_MODEL_CHAT', 'deepseek-chat')
         self.reasoner_model = os.getenv('DEEPSEEK_MODEL_REASONER', 'deepseek-reasoner')
@@ -38,13 +49,275 @@ class DeepSeekClient:
         # 超时与重试配置（可通过环境变量调整）
         # Chat默认60秒、Reasoner默认120秒，最大重试默认2次
         try:
-            self.chat_timeout_seconds = int(os.getenv('DEEPSEEK_CHAT_TIMEOUT_SECONDS', '120'))
-            self.reasoner_timeout_seconds = int(os.getenv('DEEPSEEK_REASONER_TIMEOUT_SECONDS', '180'))
+            self.chat_timeout_seconds = int(os.getenv('DEEPSEEK_CHAT_TIMEOUT_SECONDS', '180'))
+            self.reasoner_timeout_seconds = int(os.getenv('DEEPSEEK_REASONER_TIMEOUT_SECONDS', '300'))
             self.max_retries_default = int(os.getenv('DEEPSEEK_MAX_RETRIES', '3'))
         except Exception:
-            self.chat_timeout_seconds = 120
-            self.reasoner_timeout_seconds = 180
+            self.chat_timeout_seconds = 180
+            self.reasoner_timeout_seconds = 300
             self.max_retries_default = 3
+        # 连接与会话细节控制
+        try:
+            self.connect_timeout_seconds = float(os.getenv('DEEPSEEK_CONNECT_TIMEOUT_SECONDS', '20'))
+        except Exception:
+            self.connect_timeout_seconds = 20.0
+        self.httpx_trust_env = os.getenv('DEEPSEEK_HTTPX_TRUST_ENV', 'false').lower() == 'true'
+        self.httpx_verify = os.getenv('DEEPSEEK_HTTPX_VERIFY', 'true').lower() != 'false'
+        # 关闭长连接可缓解部分网关的 10054 断连（可通过环境变量关闭）
+        self.disable_keepalive = os.getenv('DEEPSEEK_DISABLE_KEEPALIVE', 'true').lower() == 'true'
+        # requests 回退的连接超时（秒）
+        try:
+            self.connect_timeout_seconds = float(os.getenv('DEEPSEEK_CONNECT_TIMEOUT_SECONDS', '20'))
+        except Exception:
+            self.connect_timeout_seconds = 20.0
+
+        # XTY(OpenAI风格)支持开关：
+        # 1) 显式开关：DEEPSEEK_USE_OPENAI_CLIENT=true
+        # 2) 或者 base_url 指向 xty.app（自动启用，优先使用新的 svip.xty.app 域名）
+        use_openai_flag = os.getenv('DEEPSEEK_USE_OPENAI_CLIENT', 'false').lower() == 'true'
+        base_is_xty = 'xty.app' in str(self.base_url).lower()
+        self.use_openai_client = (use_openai_flag or base_is_xty) and _OPENAI_AVAILABLE
+
+        # OpenAI风格客户端配置
+        self._openai_client = None
+        self._openai_base_url = os.getenv('XTY_API_BASE', os.getenv('DEEPSEEK_API_BASE', 'https://svip.xty.app/v1'))
+        self._openai_api_key = os.getenv('XTY_API_KEY', api_key)
+        # 基本 DeepSeek（requests）回退基地址
+        self._requests_fallback_base = os.getenv('DEEPSEEK_REQUESTS_BASE', os.getenv('DEEPSEEK_FALLBACK_BASE', 'https://api.deepseek.com/v1'))
+        # 预配置 requests Session：带重试与连接池
+        try:
+            self._requests_session = requests.Session()
+            retry_cfg = Retry(
+                total=3,
+                connect=3,
+                read=3,
+                status=3,
+                backoff_factor=0.5,
+                status_forcelist=(429, 500, 502, 503, 504),
+                allowed_methods=frozenset(["GET", "POST"]),
+                raise_on_status=False,
+            )
+            adapter = HTTPAdapter(max_retries=retry_cfg, pool_connections=10, pool_maxsize=10)
+            self._requests_session.mount('http://', adapter)
+            self._requests_session.mount('https://', adapter)
+            if self.disable_keepalive:
+                try:
+                    self._requests_session.headers.update({"Connection": "close"})
+                except Exception:
+                    pass
+            try:
+                self.logger.info(f"[HTTP(requests)] retries=3, backoff=0.5s, pool=10, connect_timeout={self.connect_timeout_seconds}s")
+            except Exception:
+                pass
+        except Exception:
+            self._requests_session = requests
+
+        # 收集多密钥并设置活动密钥
+        self.api_keys = self._collect_api_keys(primary_key=api_key)
+        self.current_key_index = 0
+        self._set_active_key(0)
+
+        if self.use_openai_client and self._openai_client is None:
+            try:
+                # 初始化一次（_set_active_key 已处理，若失败这里再兜底）
+                self._init_openai_client(self._openai_api_key)
+                self.logger.info(f"[OK] 已启用 XTY(OpenAI风格) 客户端: {self._openai_base_url}")
+            except Exception as e:
+                self.logger.warning(f"[WARNING] 初始化 XTY(OpenAI风格) 客户端失败，将回退 requests: {e}")
+                self.use_openai_client = False
+
+    @classmethod
+    def get_current_endpoint_url(cls) -> str:
+        try:
+            if cls.LAST_ENDPOINT_URL:
+                return cls.LAST_ENDPOINT_URL
+        except Exception:
+            pass
+        return os.getenv('XTY_API_BASE') or os.getenv('DEEPSEEK_API_BASE', 'https://svip.xty.app/v1')
+
+    def _collect_api_keys(self, primary_key: str) -> List[str]:
+        keys: List[str] = []
+        def _push(val: Optional[str]):
+            if val and isinstance(val, str):
+                v = val.strip()
+                if v and v not in keys:
+                    keys.append(v)
+        _push(primary_key)
+        _push(os.getenv('XTY_API_KEY'))
+        _push(os.getenv('DEEPSEEK_API_KEY'))
+        # 逗号分隔列表
+        for env_name in ['XTY_API_KEYS', 'DEEPSEEK_API_KEYS']:
+            raw = os.getenv(env_name, '')
+            if raw:
+                for k in raw.split(','):
+                    _push(k)
+        # 编号变量 XTY_API_KEY_1..10 / DEEPSEEK_API_KEY_1..10
+        for i in range(1, 11):
+            _push(os.getenv(f'XTY_API_KEY_{i}'))
+        for i in range(1, 11):
+            _push(os.getenv(f'DEEPSEEK_API_KEY_{i}'))
+        return keys or ([primary_key] if primary_key else [])
+
+    def _init_openai_client(self, api_key: str):
+        if not self.use_openai_client:
+            return
+        # 域名优先使用 svip.xty.app
+        if 'svip.xty.app' in str(self._openai_base_url):
+            self._openai_base_url = 'https://svip.xty.app/v1'
+        try:
+            read_timeout = max(int(self.chat_timeout_seconds), int(self.reasoner_timeout_seconds))
+        except Exception:
+            read_timeout = self.chat_timeout_seconds
+        headers = {"Connection": "close"} if self.disable_keepalive else None
+        http_client = httpx.Client(
+            base_url=self._openai_base_url,
+            follow_redirects=True,
+            http2=False,
+            timeout=httpx.Timeout(connect=20.0, read=read_timeout, write=60.0),
+            verify=self.httpx_verify,
+            trust_env=self.httpx_trust_env,
+            headers=headers,
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=(0 if self.disable_keepalive else 5)),
+        )
+        self._openai_client = OpenAI(
+            base_url=self._openai_base_url,
+            api_key=api_key,
+            http_client=http_client,
+            max_retries=3,
+        )
+
+    def _set_active_key(self, index: int):
+        if not self.api_keys:
+            return
+        self.current_key_index = max(0, min(index, len(self.api_keys) - 1))
+        self.api_key = self.api_keys[self.current_key_index]
+        # 更新 requests 头
+        self.headers["Authorization"] = f"Bearer {self.api_key}"
+        # 更新 OpenAI 客户端
+        self._openai_api_key = self.api_key
+        if self.use_openai_client:
+            try:
+                self._init_openai_client(self._openai_api_key)
+            except Exception as e:
+                self.logger.warning(f"[WARNING] OpenAI客户端重建失败: {e}")
+
+    def _mask_key(self, key: Optional[str]) -> str:
+        try:
+            if not key:
+                return '***'
+            k = str(key)
+            if len(k) <= 8:
+                return '***'
+            return f"{k[:6]}...{k[-4:]}"
+        except Exception:
+            return '***'
+
+    def _host_of(self, base_url: Optional[str]) -> str:
+        try:
+            if not base_url:
+                return ''
+            parsed = _urlparse(str(base_url))
+            return parsed.netloc or str(base_url)
+        except Exception:
+            return str(base_url) if base_url else ''
+
+    def _key_last4(self, key: Optional[str]) -> str:
+        try:
+            if not key:
+                return '****'
+            k = str(key)
+            return k[-4:] if len(k) >= 4 else '****'
+        except Exception:
+            return '****'
+
+    def _is_connection_issue(self, e: Exception) -> bool:
+        try:
+            msg = (str(e) or "").lower()
+            tokens = [
+                'apiconnectionerror',
+                'connecterror',
+                'readtimeout',
+                'remoteprotocolerror',
+                'server disconnected',
+                'connection reset by peer',
+                'winerror 10054',
+                'timed out'
+            ]
+            return any(t in msg for t in tokens)
+        except Exception:
+            return False
+
+    def _format_exception_details(self, e: Exception) -> str:
+        try:
+            import traceback
+            parts = []
+            parts.append(f"type={e.__class__.__name__}")
+            try:
+                parts.append(f"repr={repr(e)}")
+            except Exception:
+                pass
+            req = getattr(e, 'request', None)
+            if req is not None:
+                try:
+                    method = getattr(req, 'method', '') or getattr(req, 'http_method', '') or ''
+                    url = getattr(req, 'url', '') or getattr(req, 'http_url', '') or ''
+                    parts.append(f"request={method} {url}")
+                except Exception:
+                    pass
+            resp = getattr(e, 'response', None)
+            if resp is not None:
+                try:
+                    status = getattr(resp, 'status_code', None)
+                    text = getattr(resp, 'text', '')
+                    if isinstance(text, bytes):
+                        try:
+                            text = text.decode('utf-8', errors='ignore')
+                        except Exception:
+                            text = ''
+                    text_snip = (text[:200] + '...') if isinstance(text, str) and len(text) > 200 else text
+                    parts.append(f"response={status} {text_snip}")
+                except Exception:
+                    pass
+            cause_chain = []
+            seen = set()
+            cur = e
+            while cur is not None and id(cur) not in seen and len(cause_chain) < 3:
+                seen.add(id(cur))
+                try:
+                    cause_chain.append(f"{cur.__class__.__name__}: {str(cur)}")
+                except Exception:
+                    break
+                cur = getattr(cur, '__cause__', None) or getattr(cur, '__context__', None)
+            if cause_chain:
+                parts.append("cause=[" + " | ".join(cause_chain) + "]")
+            try:
+                tb = traceback.format_exc()
+                if isinstance(tb, str) and tb.strip():
+                    lines = tb.strip().splitlines()
+                    tail = lines[-6:]
+                    parts.append("trace=" + " \\n".join(tail))
+            except Exception:
+                pass
+            return " | ".join(parts)
+        except Exception:
+            return str(e)
+
+    def _rotate_key(self) -> bool:
+        if not self.api_keys or len(self.api_keys) <= 1:
+            return False
+        next_index = (self.current_key_index + 1) % len(self.api_keys)
+        if next_index == self.current_key_index:
+            return False
+        old = self.api_keys[self.current_key_index]
+        self._set_active_key(next_index)
+        new = self.api_keys[self.current_key_index]
+        try:
+            safe_old = self._mask_key(old)
+            safe_new = self._mask_key(new)
+            self.logger.info(f"[KEY-ROTATE] API Key 已切换: {safe_old} → {safe_new}")
+        except Exception:
+            self.logger.info("[KEY-ROTATE] API Key 已切换")
+        return True
 
     def get_trading_session(self) -> Dict:
         """
@@ -167,15 +440,121 @@ class DeepSeekClient:
                 if attempt > 0:
                     self.logger.warning(f"正在重试... (第{attempt}/{max_retries}次)")
 
-                response = requests.post(
-                    f"{self.base_url.rstrip('/')}/chat/completions",
-                    headers=self.headers,
-                    json=payload,
-                    timeout=timeout
-                )
+                # 优先使用 OpenAI 风格客户端（XTY网关）
+                if self.use_openai_client and self._openai_client is not None:
+                    # 调用前记录端点
+                    try:
+                        DeepSeekClient.LAST_ENDPOINT_URL = str(self._openai_base_url)
+                    except Exception:
+                        pass
+                    self.logger.info(f"[CALL] xty/openai | host={self._host_of(self._openai_base_url)} | key_last4={self._key_last4(self._openai_api_key)} | model={payload.get('model')}")
+                    try:
+                        # OpenAI SDK 返回对象，转换为与原逻辑兼容的 dict
+                        oai_resp = self._openai_client.chat.completions.create(
+                            model=payload["model"],
+                            messages=payload["messages"],
+                            temperature=payload.get("temperature", 0.7),
+                            max_tokens=payload.get("max_tokens", 2000),
+                            response_format=payload.get("response_format")
+                        )
 
-                response.raise_for_status()
-                result = response.json()
+                        # 兼容结构：choices[0].message.content
+                        result = {
+                            "choices": [
+                                {
+                                    "message": {
+                                        "content": getattr(getattr(oai_resp.choices[0], "message", {}), "content", "")
+                                    }
+                                }
+                            ],
+                            # 按需兼容 usage 字段
+                            "usage": getattr(oai_resp, "usage", {}) and {
+                                "prompt_tokens": getattr(oai_resp.usage, "prompt_tokens", 0),
+                                "completion_tokens": getattr(oai_resp.usage, "completion_tokens", 0),
+                                "total_tokens": getattr(oai_resp.usage, "total_tokens", 0)
+                            }
+                        }
+                    except Exception as e:
+                        # 如果是401 或者明确失败，尝试：1) 切域名 2) 轮换Key
+                        msg = str(e)
+                        unauthorized = ("401" in msg) or ("Unauthorized" in msg) or ("无效的令牌" in msg) or ("invalid token" in msg.lower())
+                        if unauthorized:
+                            self.logger.error(
+                                f"DeepSeek API 错误(xty/openai): 未授权 | host={self._host_of(self._openai_base_url)} | key={self._mask_key(self._openai_api_key)} | {self._format_exception_details(e)}"
+                            )
+                            switched = False
+                            if 'svip.xty.app' in str(self._openai_base_url):
+                                try:
+                                    self._openai_base_url = 'https://svip.xty.app/v1'
+                                    self._init_openai_client(self._openai_api_key)
+                                    self.logger.info("[OK] 已切换到 https://svip.xty.app/v1，准备重试")
+                                    switched = True
+                                except Exception as _e:
+                                    self.logger.warning(f"[WARNING] 切换 svip.xty.app 失败: {_e}")
+                            rotated = self._rotate_key()
+                            if attempt < max_retries and (switched or rotated):
+                                continue
+                            # OpenAI风格仍失败：尝试回退到基本DeepSeek请求
+                            try:
+                                fb_payload = dict(payload)
+                                fb_payload["model"] = os.getenv('DEEPSEEK_FALLBACK_MODEL', self.model_name)
+                                # 回退调用前记录端点
+                                try:
+                                    DeepSeekClient.LAST_ENDPOINT_URL = str(self._requests_fallback_base)
+                                except Exception:
+                                    pass
+                                self.logger.info(
+                                    f"[FALLBACK] 切换到基本DeepSeek接口: host={self._host_of(self._requests_fallback_base)} | key={self._mask_key(self.api_key)}"
+                                )
+                                response = self._requests_session.post(
+                                    f"{self._requests_fallback_base.rstrip('/')}/chat/completions",
+                                    headers={
+                                        "Authorization": f"Bearer {self.api_key}",
+                                        "Content-Type": "application/json",
+                                    },
+                                    json=fb_payload,
+                                    timeout=(self.connect_timeout_seconds, timeout)
+                                )
+                                response.raise_for_status()
+                                result = response.json()
+                                # 成功则返回结果
+                                return result
+                            except Exception as fb_e:
+                                self.logger.error(
+                                    f"[FALLBACK] 基本DeepSeek接口调用失败: host={self._host_of(self._requests_fallback_base)} | key={self._mask_key(self.api_key)} | {self._format_exception_details(fb_e)}"
+                                )
+                                if attempt < max_retries:
+                                    continue
+                        else:
+                            self.logger.error(
+                                f"DeepSeek API 调用失败(xty/openai): host={self._host_of(self._openai_base_url)} | key={self._mask_key(self._openai_api_key)} | {self._format_exception_details(e)}"
+                            )
+                        # 没有更多回退选项，则抛出让外层处理重试
+                        raise
+                else:
+                    # 传统 requests 调用（原始 DeepSeek API 或者没装 openai/httpx）
+                    try:
+                        DeepSeekClient.LAST_ENDPOINT_URL = str(self.base_url)
+                    except Exception:
+                        pass
+                    self.logger.info(f"[CALL] requests | host={self._host_of(self.base_url)} | key_last4={self._key_last4(self.api_key)} | model={payload.get('model')}")
+                    try:
+                        response = self._requests_session.post(
+                            f"{self.base_url.rstrip('/')}/chat/completions",
+                            headers=self.headers,
+                            json=payload,
+                            timeout=(self.connect_timeout_seconds, timeout)
+                        )
+                        response.raise_for_status()
+                        result = response.json()
+                    except requests.exceptions.RequestException as _req_e:
+                        try:
+                            self.logger.error(f"[requests] exception: {self._format_exception_details(_req_e)}")
+                        except Exception:
+                            pass
+                        if attempt < max_retries:
+                            continue
+                        raise
 
                 # 记录缓存使用情况（如果API返回了缓存统计）
                 if 'usage' in result:
@@ -225,12 +604,29 @@ class DeepSeekClient:
                     raise
 
             except requests.exceptions.HTTPError as e:
-                # 输出服务端返回的错误详情，便于排查 400 Bad Request
+                # 输出服务端返回的错误详情，便于排查
+                status = getattr(e.response, 'status_code', None) if hasattr(e, 'response') else None
+                text = ''
+                err_json = None
                 try:
                     err_json = response.json()
-                    self.logger.error(f"DeepSeek API 错误: {response.status_code} | {err_json}")
+                    text = json.dumps(err_json, ensure_ascii=False)
                 except Exception:
-                    self.logger.error(f"DeepSeek API 错误: {response.status_code} | {getattr(response, 'text', '')}")
+                    text = getattr(response, 'text', '')
+                self.logger.error(f"DeepSeek API 错误: {status} | {text}")
+
+                # 401 未授权：尝试切换域名 + 轮换Key 后重试
+                if status == 401 or ('无效的令牌' in text) or ('invalid token' in text.lower() if isinstance(text, str) else False):
+                    switched = False
+                    if 'svip.xty.app' in str(self.base_url):
+                        self.base_url = 'https://svip.xty.app/v1'
+                        self.logger.info("[OK] 已切换到 https://svip.xty.app/v1，准备重试")
+                        switched = True
+                    rotated = self._rotate_key()
+                    if attempt < max_retries and (switched or rotated):
+                        continue
+                if attempt < max_retries:
+                    continue
                 raise
 
             except Exception as e:
@@ -2084,4 +2480,3 @@ ORDERING: OLDEST → NEWEST
             self.logger.error(f"Chat V3.1 决策失败: {e}，回退到普通模型")
             # 如果推理模型失败，回退到普通模型
             return self.analyze_market_and_decide(market_data, account_info, trade_history)
-

@@ -1,0 +1,250 @@
+"""
+DeepSeek API 客户端
+用于 AI 交易决策
+"""
+
+import requests
+import re
+import os
+import json
+from typing import Dict, List, Optional
+import logging
+from datetime import datetime
+import pytz
+from urllib.parse import urlparse as _urlparse
+
+# 可选：XTY(OpenAI风格)客户端支持
+try:
+    from openai import OpenAI  # type: ignore
+    import httpx  # type: ignore
+    _OPENAI_AVAILABLE = True
+except Exception:
+    _OPENAI_AVAILABLE = False
+
+
+class DeepSeekClient:
+    """DeepSeek API 客户端"""
+
+    def __init__(self, api_key: str):
+        """
+        初始化 DeepSeek 客户端
+
+        Args:
+            api_key: DeepSeek API 密钥
+        """
+        self.api_key = api_key
+        # 官方 DeepSeek 端点，允许通过环境变量覆盖
+        self.base_url = os.getenv('DEEPSEEK_API_BASE', 'https://svip.xty.app/v1')
+        # 默认聊天与推理模型（可通过环境变量覆盖）
+        self.model_name = os.getenv('DEEPSEEK_MODEL_CHAT', 'deepseek-chat')
+        self.reasoner_model = os.getenv('DEEPSEEK_MODEL_REASONER', 'deepseek-reasoner')
+        self.headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        self.logger = logging.getLogger(__name__)
+
+        # 超时与重试配置（可通过环境变量调整）
+        # Chat默认60秒、Reasoner默认120秒，最大重试默认2次
+        try:
+            self.chat_timeout_seconds = int(os.getenv('DEEPSEEK_CHAT_TIMEOUT_SECONDS', '180'))
+            self.reasoner_timeout_seconds = int(os.getenv('DEEPSEEK_REASONER_TIMEOUT_SECONDS', '300'))
+            self.max_retries_default = int(os.getenv('DEEPSEEK_MAX_RETRIES', '3'))
+        except Exception:
+            self.chat_timeout_seconds = 180
+            self.reasoner_timeout_seconds = 300
+            self.max_retries_default = 3
+
+        # XTY(OpenAI风格)支持开关：
+        # 1) 显式开关：DEEPSEEK_USE_OPENAI_CLIENT=true
+        # 2) 或者 base_url 指向 xty.app（自动启用，优先使用新的 svip.xty.app 域名）
+        use_openai_flag = os.getenv('DEEPSEEK_USE_OPENAI_CLIENT', 'false').lower() == 'true'
+        base_is_xty = 'xty.app' in str(self.base_url).lower()
+        self.use_openai_client = (use_openai_flag or base_is_xty) and _OPENAI_AVAILABLE
+
+        # OpenAI风格客户端配置
+        self._openai_client = None
+        self._openai_base_url = os.getenv('XTY_API_BASE', os.getenv('DEEPSEEK_API_BASE', 'https://svip.xty.app/v1'))
+        self._openai_api_key = os.getenv('XTY_API_KEY', api_key)
+        # 基本 DeepSeek（requests）回退基地址
+        self._requests_fallback_base = os.getenv('DEEPSEEK_REQUESTS_BASE', os.getenv('DEEPSEEK_FALLBACK_BASE', 'https://api.deepseek.com/v1'))
+
+        # 收集多密钥并设置活动密钥
+        self.api_keys = self._collect_api_keys(primary_key=api_key)
+        self.current_key_index = 0
+        self._set_active_key(0)
+
+        if self.use_openai_client and self._openai_client is None:
+            try:
+                # 初始化一次（_set_active_key 已处理，若失败这里再兜底）
+                self._init_openai_client(self._openai_api_key)
+                self.logger.info(f"[OK] 已启用 XTY(OpenAI风格) 客户端: {self._openai_base_url}")
+            except Exception as e:
+                self.logger.warning(f"[WARNING] 初始化 XTY(OpenAI风格) 客户端失败，将回退 requests: {e}")
+                self.use_openai_client = False
+
+    @classmethod
+    def get_current_endpoint_url(cls) -> str:
+        try:
+            if cls.LAST_ENDPOINT_URL:
+                return cls.LAST_ENDPOINT_URL
+        except Exception:
+            pass
+        return os.getenv('XTY_API_BASE') or os.getenv('DEEPSEEK_API_BASE', 'https://svip.xty.app/v1')
+
+    def _collect_api_keys(self, primary_key: str) -> List[str]:
+        keys: List[str] = []
+        def _push(val: Optional[str]):
+            if val and isinstance(val, str):
+                v = val.strip()
+                if v and v not in keys:
+                    keys.append(v)
+        _push(primary_key)
+        _push(os.getenv('XTY_API_KEY'))
+        _push(os.getenv('DEEPSEEK_API_KEY'))
+        # 逗号分隔列表
+        for env_name in ['XTY_API_KEYS', 'DEEPSEEK_API_KEYS']:
+            raw = os.getenv(env_name, '')
+            if raw:
+                for k in raw.split(','):
+                    _push(k)
+        # 编号变量 XTY_API_KEY_1..10 / DEEPSEEK_API_KEY_1..10
+        for i in range(1, 11):
+            _push(os.getenv(f'XTY_API_KEY_{i}'))
+        for i in range(1, 11):
+            _push(os.getenv(f'DEEPSEEK_API_KEY_{i}'))
+        return keys or ([primary_key] if primary_key else [])
+
+    def _init_openai_client(self, api_key: str):
+        if not self.use_openai_client:
+            return
+        # 域名优先使用 svip.xty.app
+        if 'svip.xty.app' in str(self._openai_base_url):
+            self._openai_base_url = 'https://svip.xty.app/v1'
+        try:
+            read_timeout = max(int(self.chat_timeout_seconds), int(self.reasoner_timeout_seconds))
+        except Exception:
+            read_timeout = self.chat_timeout_seconds
+        http_client = httpx.Client(
+            base_url=self._openai_base_url,
+            follow_redirects=True,
+            http2=False,
+            timeout=httpx.Timeout(connect=20.0, read=read_timeout, write=60.0),
+            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+        )
+        self._openai_client = OpenAI(
+            base_url=self._openai_base_url,
+            api_key=api_key,
+            http_client=http_client,
+            max_retries=3,
+        )
+
+    def _set_active_key(self, index: int):
+        if not self.api_keys:
+            return
+        self.current_key_index = max(0, min(index, len(self.api_keys) - 1))
+        self.api_key = self.api_keys[self.current_key_index]
+        # 更新 requests 头
+        self.headers["Authorization"] = f"Bearer {self.api_key}"
+        # 更新 OpenAI 客户端
+        self._openai_api_key = self.api_key
+        if self.use_openai_client:
+            try:
+                self._init_openai_client(self._openai_api_key)
+            except Exception as e:
+                self.logger.warning(f"[WARNING] OpenAI客户端重建失败: {e}")
+
+    def _mask_key(self, key: Optional[str]) -> str:
+        try:
+            if not key:
+                return '***'
+            k = str(key)
+            if len(k) <= 8:
+                return '***'
+            return f"{k[:6]}...{k[-4:]}"
+        except Exception:
+            return '***'
+
+    def _host_of(self, base_url: Optional[str]) -> str:
+        try:
+            if not base_url:
+                return ''
+            parsed = _urlparse(str(base_url))
+            return parsed.netloc or str(base_url)
+        except Exception:
+            return str(base_url) if base_url else ''
+
+    def _key_last4(self, key: Optional[str]) -> str:
+        try:
+            if not key:
+                return '****'
+            k = str(key)
+            return k[-4:] if len(k) >= 4 else '****'
+        except Exception:
+            return '****'
+
+    def _format_exception_details(self, e: Exception) -> str:
+        try:
+            import traceback
+            parts = []
+            parts.append(f"type={e.__class__.__name__}")
+            try:
+                parts.append(f"repr={repr(e)}")
+            except Exception:
+                pass
+            req = getattr(e, 'request', None)
+            if req is not None:
+                try:
+                    method = getattr(req, 'method', '') or getattr(req, 'http_method', '') or ''
+                    url = getattr(req, 'url', '') or getattr(req, 'http_url', '') or ''
+                    parts.append(f"request={method} {url}")
+                except Exception:
+                    pass
+            resp = getattr(e, 'response', None)
+            if resp is not None:
+                try:
+                    status = getattr(resp, 'status_code', None)
+                    text = getattr(resp, 'text', '')
+                    if isinstance(text, bytes):
+                        try:
+                            text = text.decode('utf-8', errors='ignore')
+                        except Exception:
+                            text = ''
+                    text_snip = (text[:200] + '...') if isinstance(text, str) and len(text) > 200 else text
+                    parts.append(f"response={status} {text_snip}")
+                except Exception:
+                    pass
+            cause_chain = []
+            seen = set()
+            cur = e
+            while cur is not None and id(cur) not in seen and len(cause_chain) < 3:
+                seen.add(id(cur))
+                try:
+                    cause_chain.append(f"{cur.__class__.__name__}: {str(cur)}")
+                except Exception:
+                    break
+                cur = getattr(cur, '__cause__', None) or getattr(cur, '__context__', None)
+            if cause_chain:
+                parts.append("cause=[" + " | ".join(cause_chain) + "]")
+            try:
+                tb = traceback.format_exc()
+                if isinstance(tb, str) and tb.strip():
+                    lines = tb.strip().splitlines()
+                    tail = lines[-6:]
+                    parts.append("trace=" + " \\n".join(tail))
+            except Exception:
+                pass
+            return " | ".join(parts)
+        except Exception:
+            return str(e)
+
+    def _rotate_key(self) -> bool:
+        if not self.api_keys or len(self.api_keys) <= 1:
+            return False
+        next_index = (self.current_key_index + 1) % len(self.api_keys)
+        if next_index == self.current_key_index:
+            return False
+        old = self.api_keys[self.current_key_index]
+        self._set_active_key(next_index)
+        new = self.api_keys[self.current_key_index]
+        try:

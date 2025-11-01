@@ -72,6 +72,13 @@ class BinanceClient:
         session.mount("https://", adapter)
         session.mount("http://", adapter)
 
+        # 仅对 Binance 请求使用本地代理（127.0.0.1:7890）
+        # 不影响其他模块的网络请求（它们不使用此 session）
+        session.proxies.update({
+            "http": "http://127.0.0.1:7890",
+            "https": "http://127.0.0.1:7890",
+        })
+
         return session
 
     def _generate_signature(self, params: Dict[str, Any]) -> str:

@@ -60,13 +60,25 @@ class AlphaArenaBot:
         # 创建 logs 目录
         os.makedirs('logs', exist_ok=True)
 
+        # 优先尝试将标准输出/错误切换为UTF-8，避免Windows控制台编码问题
+        try:
+            if hasattr(sys.stdout, 'reconfigure'):
+                sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            if hasattr(sys.stderr, 'reconfigure'):
+                sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+        except Exception:
+            pass
+
         # 创建logger
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.INFO)
         self.logger.handlers = []  # 清除现有handlers
 
         # 文件日志handler（不带颜色）
-        file_handler = logging.FileHandler(f'logs/alpha_arena_{datetime.now().strftime("%Y%m%d")}.log')
+        file_handler = logging.FileHandler(
+            f'logs/alpha_arena_{datetime.now().strftime("%Y%m%d")}.log',
+            encoding='utf-8'
+        )
         file_handler.setLevel(logging.INFO)
         file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         file_handler.setFormatter(file_formatter)
@@ -76,6 +88,32 @@ class AlphaArenaBot:
         console_handler.setLevel(logging.INFO)
         console_formatter = ProTradingFormatter(compact=True)
         console_handler.setFormatter(console_formatter)
+
+        # 在控制台handler上增加安全过滤器：移除控制台编码无法显示的字符（如emoji）
+        class _SafeConsoleFilter(logging.Filter):
+            def __init__(self, stream):
+                super().__init__()
+                try:
+                    self.encoding = getattr(stream, 'encoding', None) or sys.getfilesystemencoding() or 'utf-8'
+                except Exception:
+                    self.encoding = 'utf-8'
+
+            def filter(self, record: logging.LogRecord) -> bool:
+                try:
+                    # 仅针对控制台输出做安全编码；文件输出保持UTF-8完整信息
+                    msg = record.getMessage()
+                    safe = msg.encode(self.encoding, errors='ignore').decode(self.encoding, errors='ignore')
+                    # 将消息回写到record，避免格式化阶段再次触发编码错误
+                    record.msg = safe
+                    record.args = ()
+                except Exception:
+                    pass
+                return True
+
+        try:
+            console_handler.addFilter(_SafeConsoleFilter(sys.stdout))
+        except Exception:
+            pass
 
         # 添加handlers
         self.logger.addHandler(file_handler)
